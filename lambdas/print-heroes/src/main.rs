@@ -14,9 +14,9 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 #[tokio::main]
 async fn main(event: Value) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
-    let heroes_table_env = "HEROES_TABLE";
+    let league_table_env = "LEAGUE_TABLE";
 
-    let table_name = env::var(heroes_table_env).expect("Expected environment variable HEROES_TABLE not set");
+    let table_name = env::var(league_table_env).expect("Expected environment variable LEAGUE_TABLE not set");
     
     let scan_input: ScanInput = ScanInput {
         table_name: String::from(table_name),

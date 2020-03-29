@@ -6,7 +6,7 @@ provider:
   region: eu-central-1
   stage: dev
   environment:
-    HEROES_TABLE: ${self:service}-${self:provider.stage}-heroes
+    LEAGUE_TABLE: ${self:service}-${self:provider.stage}-league
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     HOSTED_DOMAIN: ${env:HOSTED_DOMAIN}
   iamRoleStatements:
@@ -14,7 +14,7 @@ provider:
       Action:
         - dynamodb:*
       Resource:
-        - "Fn::GetAtt": [ HeroesTable, Arn ]
+        - "Fn::GetAtt": [ LeagueTable, Arn ]
 
 custom:
   rust:
@@ -35,7 +35,7 @@ functions:
 
 resources:
   Resources:
-    HeroesTable:
+    LeagueTable:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
@@ -47,4 +47,4 @@ resources:
         BillingMode: PAY_PER_REQUEST
         SSESpecification:
           SSEEnabled: true
-        TableName: !Sub ${self:provider.environment.HEROES_TABLE}
+        TableName: !Sub ${self:provider.environment.LEAGUE_TABLE}
