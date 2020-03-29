@@ -1,0 +1,19 @@
+{
+  "name": "hero-of-the-day",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lxwbr/hero-of-the-day.git"
+  },
+  "author": "Alexander Weber",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lxwbr/hero-of-the-day/issues"
+  },
+  "homepage": "https://github.com/lxwbr/hero-of-the-day#readme",
+  "devDependencies": {
+    "serverless": "1.67.0",
+    "serverless-rust": "0.3.7",
+    "serverless-pseudo-parameters": "2.5.0"
+  }
+}
