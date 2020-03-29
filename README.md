@@ -2,4 +2,4 @@
 
 ## Backend 
 
-For information on deployment of the backend, please see the respective documentation [here](./backend/README.md).
+For information on deployment of the backend, please see the respective documentation [here](./backend).
