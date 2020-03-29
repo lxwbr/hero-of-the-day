@@ -1,0 +1,2 @@
+[workspace]
+members = ["lambdas/print-heroes", "lambdas/custom-authorizer"]

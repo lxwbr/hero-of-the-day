@@ -27,6 +27,12 @@ plugins:
   - serverless-rust
   - serverless-pseudo-parameters
 
+functions:
+  print-heroes:
+    handler: print-heroes
+  custom-authorizer:
+    handler: custom-authorizer
+
 resources:
   Resources:
     HeroesTable:
