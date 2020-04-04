@@ -1,5 +1,7 @@
 # hero-of-the-day
 
-## Backend 
+## Deployment
 
-For information on deployment of the backend, please see the respective documentation [here](./backend).
+```
+GOOGLE_CLIENT_ID="XXXXXXXXXXXX.apps.googleusercontent.com" HOSTED_DOMAIN="your-domain.io" serverless deploy
+```
