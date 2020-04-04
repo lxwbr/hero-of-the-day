@@ -1,0 +1,19 @@
+[package]
+name = "user-create"
+version = "0.1.0"
+authors = ["Alex Weber <lexwbr@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "0.2.13", features = ["full"] }
+lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusoto_core = "0.43"
+rusoto_dynamodb = "0.43"
+model = { path = "../../model" }
+response = { path = "../../response" }
+repository = { path = "../../repository" }
+maplit = "1.0.2"

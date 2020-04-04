@@ -2,7 +2,7 @@ use lambda::handler_fn;
 use serde_json::{ Value, json };
 use std::env;
 use response::ok;
-use model::hero::{Hero, from_dynamo_item};
+use model::hero::Hero;
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
@@ -33,7 +33,7 @@ async fn func(_event: Value) -> Result<Value, Error> {
     let heroes: Vec<Hero> = client.scan(scan_input).await?.items
         .ok_or(HeroListError::NoneScan)?
         .into_iter()
-        .map(from_dynamo_item)
+        .map(Hero::from_dynamo_item)
         .collect();
 
     Ok(ok(json!(heroes).to_string()))

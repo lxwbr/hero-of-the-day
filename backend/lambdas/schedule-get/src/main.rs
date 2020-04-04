@@ -2,7 +2,7 @@ use lambda::handler_fn;
 use serde_json::{ Value, json };
 use std::env;
 use response::ok;
-use model::schedule::{Schedule, from_dynamo_item};
+use model::schedule::Schedule;
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
@@ -44,7 +44,7 @@ async fn func(event: Value) -> Result<Value, Error> {
     let schedules: Vec<Schedule> = client.query(query_input).await?.items
         .ok_or(ScheduleGetError::NoneScan)?
         .into_iter()
-        .map(from_dynamo_item)
+        .map(Schedule::from_dynamo_item)
         .collect();
     Ok(ok(json!(schedules).to_string()))
 }

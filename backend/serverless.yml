@@ -8,6 +8,7 @@ provider:
   environment:
     HERO_TABLE: ${self:service}-${self:provider.stage}-hero
     SCHEDULE_TABLE: ${self:service}-${self:provider.stage}-schedule
+    USER_TABLE: ${self:service}-${self:provider.stage}-user
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     HOSTED_DOMAIN: ${env:HOSTED_DOMAIN}
   iamRoleStatements:
@@ -17,6 +18,7 @@ provider:
       Resource:
         - "Fn::GetAtt": [ HeroTable, Arn ]
         - "Fn::GetAtt": [ ScheduleTable, Arn ]
+        - "Fn::GetAtt": [ UserTable, Arn ]
 
 custom:
   rust:
@@ -48,6 +50,18 @@ functions:
       - http:
           path: schedule/{hero}
           method: get
+          cors: true
+          authorizer:
+            name: custom-authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+  user-create:
+    handler: user-create
+    events:
+      - http:
+          path: user
+          method: post
           cors: true
           authorizer:
             name: custom-authorizer
@@ -107,3 +121,16 @@ resources:
         SSESpecification:
           SSEEnabled: true
         TableName: !Sub ${self:provider.environment.SCHEDULE_TABLE}
+    UserTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        SSESpecification:
+          SSEEnabled: true
+        TableName: !Sub ${self:provider.environment.USER_TABLE}
