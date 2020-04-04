@@ -6,7 +6,8 @@ provider:
   region: eu-central-1
   stage: dev
   environment:
-    LEAGUE_TABLE: ${self:service}-${self:provider.stage}-league
+    HERO_TABLE: ${self:service}-${self:provider.stage}-hero
+    SCHEDULE_TABLE: ${self:service}-${self:provider.stage}-schedule
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     HOSTED_DOMAIN: ${env:HOSTED_DOMAIN}
   iamRoleStatements:
@@ -14,7 +15,8 @@ provider:
       Action:
         - dynamodb:*
       Resource:
-        - "Fn::GetAtt": [ LeagueTable, Arn ]
+        - "Fn::GetAtt": [ HeroTable, Arn ]
+        - "Fn::GetAtt": [ ScheduleTable, Arn ]
 
 custom:
   rust:
@@ -28,14 +30,54 @@ plugins:
   - serverless-pseudo-parameters
 
 functions:
-  print-heroes:
-    handler: print-heroes
+  hero-list:
+    handler: hero-list
+    events:
+      - http:
+          path: hero/list
+          method: get
+          cors: true
+          authorizer:
+            name: custom-authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+  schedule-get:
+    handler: schedule-get
+    events:
+      - http:
+          path: schedule/{hero}
+          method: get
+          cors: true
+          authorizer:
+            name: custom-authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
   custom-authorizer:
     handler: custom-authorizer
 
 resources:
   Resources:
-    LeagueTable:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    GatewayResponseDefault5XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    HeroTable:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
@@ -47,4 +89,21 @@ resources:
         BillingMode: PAY_PER_REQUEST
         SSESpecification:
           SSEEnabled: true
-        TableName: !Sub ${self:provider.environment.LEAGUE_TABLE}
+        TableName: !Sub ${self:provider.environment.HERO_TABLE}
+    ScheduleTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: hero
+            AttributeType: S
+          - AttributeName: shift_start_time
+            AttributeType: N
+        KeySchema:
+          - AttributeName: hero
+            KeyType: HASH
+          - AttributeName: shift_start_time
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        SSESpecification:
+          SSEEnabled: true
+        TableName: !Sub ${self:provider.environment.SCHEDULE_TABLE}

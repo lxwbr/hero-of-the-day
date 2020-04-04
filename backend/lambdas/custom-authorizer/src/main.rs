@@ -18,8 +18,10 @@ async fn main(event: Value) -> Result<Value, Error> {
     client.audiences.push(google_client_id.clone());
     client.hosted_domains.push(hosted_domain.clone());
 
-    let id_info = client.verify(&event["authorizationToken"].as_str().expect("Expected authorizationToken to be part of the event")).expect("Expected token to be valid");
-    println!("Success! Signed-in as {}", id_info.sub);
+    // This will slice out the `Bearer ` part of the authorization token
+    let id_token = &event["authorizationToken"].as_str().expect("Expected authorizationToken to be part of the event")[7..];
+    let id_info = client.verify(id_token).expect("Expected token to be valid");
+    println!("Success! Signed-in as {:?}", id_info.email);
     let response = json!({
         "principalId": id_info.sub,
         "policyDocument": {
