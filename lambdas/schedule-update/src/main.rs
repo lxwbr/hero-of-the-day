@@ -1,19 +1,22 @@
 use lambda::handler_fn;
-use serde_json::{ Value, json, from_str };
 use response::ok;
+use serde_json::{from_str, json, Value};
+use std::str::FromStr;
 extern crate chrono;
-use chrono::{DateTime};
+use chrono::DateTime;
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 
-use rusoto_core::{Region};
-use rusoto_dynamodb::{DynamoDbClient};
+use rusoto_core::Region;
+use rusoto_dynamodb::DynamoDbClient;
 
 mod error;
 use error::ScheduleUpdateError;
-use repository::{ schedule::{ ScheduleRepository, Operation }, hero::HeroRepository };
-use std::str::FromStr;
+use repository::{
+    hero::HeroRepository,
+    schedule::{Operation, ScheduleRepository},
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -29,18 +32,47 @@ async fn func(event: Value) -> Result<Value, Error> {
 
     let schedule_repository = ScheduleRepository::new(&client);
 
-    let hero =  event["pathParameters"]["hero"].as_str().ok_or(ScheduleUpdateError::HeroParameterMissing)?.to_string();
+    let hero = event["pathParameters"]["hero"]
+        .as_str()
+        .ok_or(ScheduleUpdateError::HeroParameterMissing)?
+        .to_string();
 
     let body: Value = from_str(event["body"].as_str().unwrap())?;
     let shift_start_time = DateTime::parse_from_rfc3339(
-        body["shift_start_time"].as_str().expect("`shift_start_time` has to be a rfc3339 string")
-    ).unwrap().timestamp();
+        body["shift_start_time"]
+            .as_str()
+            .expect("`shift_start_time` has to be a rfc3339 string"),
+    )
+    .unwrap()
+    .timestamp();
 
-    let assignees: Vec<String> = body["assignees"].as_array().ok_or(ScheduleUpdateError::AssigneesMissing)?.into_iter().map(|value| value.as_str().expect("Expected assignees entries to be strings").to_string()).collect();
+    let assignees: Vec<String> = body["assignees"]
+        .as_array()
+        .ok_or(ScheduleUpdateError::AssigneesMissing)?
+        .into_iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("Expected assignees entries to be strings")
+                .to_string()
+        })
+        .collect();
 
-    let operation = Operation::from_str(body["operation"].as_str().expect("`operation` not specified in the body")).expect("`operation` has to be of type ADD or DELETE");
+    let operation = Operation::from_str(
+        body["operation"]
+            .as_str()
+            .expect("`operation` not specified in the body"),
+    )
+    .expect("`operation` has to be of type ADD or DELETE");
 
-    let schedule = schedule_repository.update_assignees(&operation, hero.clone(), shift_start_time, assignees.clone()).await?;
+    let schedule = schedule_repository
+        .update_assignees(
+            &operation,
+            hero.clone(),
+            shift_start_time,
+            assignees.clone(),
+        )
+        .await?;
 
     println!("Updated the schedule: {:?}", schedule);
 

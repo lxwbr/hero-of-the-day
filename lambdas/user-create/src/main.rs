@@ -1,14 +1,14 @@
 use lambda::handler_fn;
-use serde_json::{ Value, json };
-use response::ok;
 use model::user::User;
+use repository::user::UserRepository;
+use response::ok;
+use serde_json::{json, Value};
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 
-use rusoto_core::{Region};
-use rusoto_dynamodb::{DynamoDbClient};
-use repository::user::UserRepository;
+use rusoto_core::Region;
+use rusoto_dynamodb::DynamoDbClient;
 
 mod error;
 use error::UserPutError;
@@ -28,8 +28,11 @@ async fn func(event: Value) -> Result<Value, Error> {
     let repository = UserRepository::new(&client);
 
     let user = User {
-        email: event["email"].as_str().ok_or(UserPutError::NoEmailProvided)?.to_string(),
-        last_login: None
+        email: event["email"]
+            .as_str()
+            .ok_or(UserPutError::NoEmailProvided)?
+            .to_string(),
+        last_login: None,
     };
 
     repository.put(&user).await?;

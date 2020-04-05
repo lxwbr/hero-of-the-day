@@ -1,6 +1,6 @@
-use std::env;
-use rusoto_dynamodb::{DynamoDb, AttributeValue, DynamoDbClient, GetItemInput, UpdateItemInput};
 use model::hero::Hero;
+use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput, UpdateItemInput};
+use std::env;
 
 use maplit::hashmap;
 
@@ -8,17 +8,19 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub struct HeroRepository<'a> {
     client: &'a DynamoDbClient,
-    table_name: String
+    table_name: String,
 }
 
-
-impl HeroRepository <'_> {
+impl HeroRepository<'_> {
     pub fn new(client: &DynamoDbClient) -> HeroRepository {
-        HeroRepository { client, table_name: env::var("HERO_TABLE").unwrap() }
+        HeroRepository {
+            client,
+            table_name: env::var("HERO_TABLE").unwrap(),
+        }
     }
 
     pub async fn get(self, name: String) -> Result<Hero, Error> {
-        let attribute_values = hashmap!{
+        let attribute_values = hashmap! {
             "name".to_owned() => AttributeValue {
                 s: Some(name),
                 ..Default::default()
@@ -32,14 +34,22 @@ impl HeroRepository <'_> {
         };
 
         let hero: Hero = Hero::from_dynamo_item(
-            self.client.get_item(get_item_input).await?.item.expect("Expected to receive an item")
+            self.client
+                .get_item(get_item_input)
+                .await?
+                .item
+                .expect("Expected to receive an item"),
         );
 
         Ok(hero)
     }
 
-    pub async fn append_members(self, hero: String, members: Vec<String>) -> Result<Vec<String>, Error> {
-        let key = hashmap!{
+    pub async fn append_members(
+        self,
+        hero: String,
+        members: Vec<String>,
+    ) -> Result<Vec<String>, Error> {
+        let key = hashmap! {
             "name".to_string() => AttributeValue {
                 s: Some(hero.clone()),
                 ..Default::default()
@@ -62,13 +72,21 @@ impl HeroRepository <'_> {
             ..Default::default()
         };
 
-        let attributes = self.client.update_item(update_item_input).await?.attributes.expect("Expected attributes from the UpdateItemInput.");
+        let attributes = self
+            .client
+            .update_item(update_item_input)
+            .await?
+            .attributes
+            .expect("Expected attributes from the UpdateItemInput.");
 
         if attributes.is_empty() {
             Ok(Vec::new())
         } else {
             let appended_members = attributes["members"].ss.as_ref().unwrap().to_vec();
-            println!("Following were added to the {} hero as members: {:?}", hero, appended_members);
+            println!(
+                "Following were added to the {} hero as members: {:?}",
+                hero, appended_members
+            );
             Ok(appended_members)
         }
     }

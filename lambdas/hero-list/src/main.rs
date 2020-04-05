@@ -1,13 +1,13 @@
 use lambda::handler_fn;
-use serde_json::{ Value, json };
-use std::env;
-use response::ok;
 use model::hero::Hero;
+use response::ok;
+use serde_json::{json, Value};
+use std::env;
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 
-use rusoto_core::{Region};
+use rusoto_core::Region;
 use rusoto_dynamodb::{DynamoDb, DynamoDbClient, ScanInput};
 
 mod error;
@@ -30,7 +30,10 @@ async fn func(_event: Value) -> Result<Value, Error> {
         ..Default::default()
     };
 
-    let heroes: Vec<Hero> = client.scan(scan_input).await?.items
+    let heroes: Vec<Hero> = client
+        .scan(scan_input)
+        .await?
+        .items
         .ok_or(HeroListError::NoneScan)?
         .into_iter()
         .map(Hero::from_dynamo_item)

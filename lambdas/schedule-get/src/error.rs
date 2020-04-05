@@ -1,9 +1,9 @@
-use std::fmt::{ Display, Result, Formatter };
 use std::error::Error;
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug)]
 pub enum ScheduleGetError {
-    HeroParameterMissing
+    HeroParameterMissing,
 }
 
 impl Error for ScheduleGetError {}
@@ -11,7 +11,9 @@ impl Error for ScheduleGetError {}
 impl Display for ScheduleGetError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match *self {
-            ScheduleGetError::HeroParameterMissing => write!(f, "`hero` is missing in `pathParameters`!")
+            ScheduleGetError::HeroParameterMissing => {
+                write!(f, "`hero` is missing in `pathParameters`!")
+            }
         }
     }
 }

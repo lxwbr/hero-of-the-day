@@ -1,23 +1,25 @@
-use std::env;
-use rusoto_dynamodb::{DynamoDb, AttributeValue, DynamoDbClient, PutItemInput};
-use model::user::User;
 use maplit::hashmap;
+use model::user::User;
+use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, PutItemInput};
+use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub struct UserRepository<'a> {
     client: &'a DynamoDbClient,
-    table_name: String
+    table_name: String,
 }
 
-
-impl UserRepository <'_> {
+impl UserRepository<'_> {
     pub fn new(client: &DynamoDbClient) -> UserRepository {
-        UserRepository { client, table_name: env::var("USER_TABLE").unwrap() }
+        UserRepository {
+            client,
+            table_name: env::var("USER_TABLE").unwrap(),
+        }
     }
 
     pub async fn put(self, user: &User) -> Result<&User, Error> {
-        let mut item = hashmap!{
+        let mut item = hashmap! {
             "email".to_owned() => AttributeValue {
                 s: Some(user.email.clone()),
                 ..Default::default()
@@ -25,10 +27,13 @@ impl UserRepository <'_> {
         };
 
         if let Some(last_login) = user.last_login {
-            item.insert("last_login".to_string(), AttributeValue {
-                n: Some(last_login.to_string()),
-                ..Default::default()
-            });
+            item.insert(
+                "last_login".to_string(),
+                AttributeValue {
+                    n: Some(last_login.to_string()),
+                    ..Default::default()
+                },
+            );
         }
 
         let put_item_input = PutItemInput {

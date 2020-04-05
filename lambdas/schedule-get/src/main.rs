@@ -1,12 +1,12 @@
 use lambda::handler_fn;
-use serde_json::{ Value, json };
 use response::ok;
+use serde_json::{json, Value};
 
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 
-use rusoto_core::{Region};
-use rusoto_dynamodb::{DynamoDbClient};
+use rusoto_core::Region;
+use rusoto_dynamodb::DynamoDbClient;
 
 mod error;
 use error::ScheduleGetError;
@@ -25,7 +25,9 @@ async fn func(event: Value) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
     let repository = ScheduleRepository::new(&client);
 
-    let hero =  event["pathParameters"]["hero"].as_str().ok_or(ScheduleGetError::HeroParameterMissing)?;
+    let hero = event["pathParameters"]["hero"]
+        .as_str()
+        .ok_or(ScheduleGetError::HeroParameterMissing)?;
 
     let schedules = repository.get(hero.to_string()).await?;
 

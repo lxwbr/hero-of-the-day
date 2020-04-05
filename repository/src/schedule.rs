@@ -1,21 +1,24 @@
-use std::env;
-use rusoto_dynamodb::{DynamoDb, AttributeValue, DynamoDbClient, QueryInput, UpdateItemInput, DeleteItemInput };
-use model::schedule::Schedule;
 use maplit::hashmap;
+use model::schedule::Schedule;
+use rusoto_dynamodb::{
+    AttributeValue, DeleteItemInput, DynamoDb, DynamoDbClient, QueryInput, UpdateItemInput,
+};
+use std::env;
 
-#[path = "error.rs"] mod error;
+#[path = "error.rs"]
+mod error;
 use error::RepositoryError;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub struct ScheduleRepository<'a> {
     client: &'a DynamoDbClient,
-    table_name: String
+    table_name: String,
 }
 
 pub enum Operation {
     Add,
-    Delete
+    Delete,
 }
 
 impl std::str::FromStr for Operation {
@@ -30,13 +33,16 @@ impl std::str::FromStr for Operation {
     }
 }
 
-impl ScheduleRepository <'_> {
+impl ScheduleRepository<'_> {
     pub fn new(client: &DynamoDbClient) -> ScheduleRepository {
-        ScheduleRepository { client, table_name: env::var("SCHEDULE_TABLE").unwrap() }
+        ScheduleRepository {
+            client,
+            table_name: env::var("SCHEDULE_TABLE").unwrap(),
+        }
     }
 
     pub async fn get(self, hero: String) -> Result<Vec<Schedule>, Error> {
-        let attribute_values = hashmap!{
+        let attribute_values = hashmap! {
             ":hero".to_owned() => AttributeValue {
                 s: Some(hero),
                 ..Default::default()
@@ -50,7 +56,11 @@ impl ScheduleRepository <'_> {
             ..Default::default()
         };
 
-        let schedules: Vec<Schedule> = self.client.query(query_input).await?.items
+        let schedules: Vec<Schedule> = self
+            .client
+            .query(query_input)
+            .await?
+            .items
             .ok_or(RepositoryError::NoneScan)?
             .into_iter()
             .map(Schedule::from_dynamo_item)
@@ -59,8 +69,14 @@ impl ScheduleRepository <'_> {
         Ok(schedules)
     }
 
-    pub async fn update_assignees(self, operation: &Operation, hero: String, shift_start_time: i64, assignees: Vec<String>) -> Result<Option<Schedule>, Error> {
-        let key = hashmap!{
+    pub async fn update_assignees(
+        self,
+        operation: &Operation,
+        hero: String,
+        shift_start_time: i64,
+        assignees: Vec<String>,
+    ) -> Result<Option<Schedule>, Error> {
+        let key = hashmap! {
             "hero".to_string() => AttributeValue {
                 s: Some(hero),
                 ..Default::default()
@@ -80,7 +96,7 @@ impl ScheduleRepository <'_> {
 
         let update_expression = match operation {
             Operation::Add => "ADD assignees :a".to_string(),
-            Operation::Delete => "DELETE assignees :a".to_string()
+            Operation::Delete => "DELETE assignees :a".to_string(),
         };
 
         let update_item_input = UpdateItemInput {
@@ -93,7 +109,9 @@ impl ScheduleRepository <'_> {
         };
 
         let attributes = self.client.update_item(update_item_input).await?.attributes;
-        let schedule = Schedule::from_dynamo_item(attributes.expect("Expected attributes from the UpdateItemInput."));
+        let schedule = Schedule::from_dynamo_item(
+            attributes.expect("Expected attributes from the UpdateItemInput."),
+        );
 
         if schedule.assignees.is_empty() {
             let delete_item_input = DeleteItemInput {
