@@ -38,10 +38,10 @@ impl HeroRepository <'_> {
         Ok(hero)
     }
 
-    pub async fn append_members(self, hero: String, members: Vec<String>) -> Result<Hero, Error> {
+    pub async fn append_members(self, hero: String, members: Vec<String>) -> Result<Vec<String>, Error> {
         let key = hashmap!{
             "name".to_string() => AttributeValue {
-                s: Some(hero),
+                s: Some(hero.clone()),
                 ..Default::default()
             }
         };
@@ -58,12 +58,18 @@ impl HeroRepository <'_> {
             key,
             update_expression: Some("ADD members :m".to_string()),
             expression_attribute_values: Some(expression_attribute_values),
-            return_values: Some("ALL_NEW".to_string()),
+            return_values: Some("UPDATED_NEW".to_string()),
             ..Default::default()
         };
 
         let attributes = self.client.update_item(update_item_input).await?.attributes.expect("Expected attributes from the UpdateItemInput.");
 
-        Ok(Hero::from_dynamo_item(attributes))
+        if attributes.is_empty() {
+            Ok(Vec::new())
+        } else {
+            let appended_members = attributes["members"].ss.as_ref().unwrap().to_vec();
+            println!("Following were added to the {} hero as members: {:?}", hero, appended_members);
+            Ok(appended_members)
+        }
     }
 }

@@ -19,7 +19,10 @@ impl Schedule {
         Schedule {
             hero: item["hero"].s.as_ref().expect("hero attribute is missing in the League entry").to_owned(),
             shift_start_time: i64::from_str(item["shift_start_time"].n.as_ref().expect("shift_start_time attribute is missing in the League entry")).expect("shift_start_time attribute was not an N field").to_owned(),
-            assignees: item["assignees"].ss.as_ref().unwrap_or(&Vec::new()).to_owned()
+            assignees: match item.get("assignees") {
+                Some(assignees) => assignees.ss.as_ref().unwrap_or(&Vec::new()).to_owned(),
+                None => Vec::new()
+            }
         }
     }
 }
