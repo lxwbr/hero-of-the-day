@@ -25,7 +25,7 @@ async fn main() -> Result<(), Error> {
 async fn func(event: Value) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
 
-    let repository = UserRepository::new(client);
+    let repository = UserRepository::new(&client);
 
     let user = User {
         email: event["email"].as_str().ok_or(UserPutError::NoEmailProvided)?.to_string(),

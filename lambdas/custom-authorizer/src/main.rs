@@ -3,7 +3,7 @@ use serde_json::{ Value, json };
 use std::env;
 use google_signin;
 use model::user::User;
-use repository::user::UserRepository;
+use repository::{ user::UserRepository, hero::HeroRepository };
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 
@@ -36,23 +36,38 @@ async fn func(event: Value) -> Result<Value, Error> {
     let method_arn = event["methodArn"].as_str().expect("Expected methodArn to be part of the event");
     let id_info = client.verify(id_token).expect("Expected token to be valid");
     println!("Success! Signed-in as {:?}", id_info.email);
-    logged_in(id_info.email.to_owned().expect("id_info should have the email field")).await?;
 
-    check_user(method_arn.to_owned(), id_info).await
+    let client = DynamoDbClient::new(Region::default());
+
+    logged_in(&client, id_info.email.to_owned().expect("id_info should have the email field")).await?;
+
+    check_user(&client, method_arn.to_owned(), id_info).await
 }
 
-async fn check_user(method_arn: String, id_info: google_signin::IdInfo) -> Result<Value, Error> {
+async fn check_user(client: &DynamoDbClient, method_arn: String, id_info: google_signin::IdInfo) -> Result<Value, Error> {
+    let sub = id_info.sub;
     let parts: Vec<&str> = method_arn.split("/").collect();
     let http_verb = parts[2];
     let resource = parts[3];
+    let sub_resource = parts[4];
 
-    let apply_policy = policy( id_info.sub, method_arn.clone());
+    let apply_policy = policy( sub.clone(), method_arn.clone());
 
     let value = if http_verb == "POST" || http_verb == "PUT" {
         if resource == "user" {
             apply_policy(Effect::Allow)
         } else {
-            apply_policy(Effect::Deny)
+            let repository = HeroRepository::new(client);
+            let hero = repository.get(sub_resource.to_string()).await?;
+            let email = id_info.email.expect("id_info should have the email field");
+            println!("email: {} in {:?}", email, hero.members);
+            if hero.members.contains(&email) {
+                println!("ALLOW");
+                apply_policy(Effect::Allow)
+            } else {
+                println!("DENY");
+                apply_policy(Effect::Deny)
+            }
         }
     } else {
         apply_policy(Effect::Allow)
@@ -66,9 +81,7 @@ enum Effect {
     Deny
 }
 
-async fn logged_in(email: String) -> Result<User, Error> {
-    let client = DynamoDbClient::new(Region::default());
-
+async fn logged_in(client: &DynamoDbClient, email: String) -> Result<User, Error> {
     let repository = UserRepository::new(client);
 
     let user = User {

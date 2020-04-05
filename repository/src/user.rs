@@ -5,14 +5,15 @@ use maplit::hashmap;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub struct UserRepository {
-    client: DynamoDbClient
+pub struct UserRepository<'a> {
+    client: &'a DynamoDbClient,
+    table_name: String
 }
 
 
-impl UserRepository {
-    pub fn new(client: DynamoDbClient) -> UserRepository {
-        UserRepository { client }
+impl UserRepository <'_> {
+    pub fn new(client: &DynamoDbClient) -> UserRepository {
+        UserRepository { client, table_name: env::var("USER_TABLE").unwrap() }
     }
 
     pub async fn put(self, user: &User) -> Result<&User, Error> {
@@ -31,7 +32,7 @@ impl UserRepository {
         }
 
         let put_item_input = PutItemInput {
-            table_name: env::var("USER_TABLE")?,
+            table_name: self.table_name,
             item,
             return_values: Some("ALL_OLD".to_string()),
             ..Default::default()

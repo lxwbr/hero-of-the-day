@@ -56,6 +56,18 @@ functions:
             resultTtlInSeconds: 0
             identitySource: method.request.header.Authorization
             type: token
+  schedule-update:
+    handler: schedule-update
+    events:
+      - http:
+          path: schedule/{hero}
+          method: post
+          cors: true
+          authorizer:
+            name: custom-authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
   user-create:
     handler: user-create
     events:
