@@ -1,11 +1,9 @@
+use chrono::prelude::*;
 use rusoto_dynamodb::AttributeValue;
 use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::str::FromStr;
-
-extern crate chrono;
-use chrono::prelude::*;
 
 #[derive(Debug)]
 pub struct Schedule {

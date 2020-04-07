@@ -15,6 +15,14 @@ pub fn ok(body: String) -> Value {
     })
 }
 
+pub fn bad_request(body: String) -> Value {
+    json!({
+        "statusCode": 400,
+        "headers": headers(),
+        "body": body
+    })
+}
+
 pub fn server_error(body: String) -> Value {
     json!({
         "statusCode": 500,

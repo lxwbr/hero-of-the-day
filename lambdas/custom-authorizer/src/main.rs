@@ -2,13 +2,10 @@ use google_signin;
 use lambda::handler_fn;
 use model::user::User;
 use repository::{hero::HeroRepository, user::UserRepository};
-use serde_json::{json, Value};
-use std::env;
-extern crate rusoto_core;
-extern crate rusoto_dynamodb;
-
 use rusoto_core::Region;
 use rusoto_dynamodb::DynamoDbClient;
+use serde_json::{json, Value};
+use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

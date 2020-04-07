@@ -1,16 +1,12 @@
+mod error;
+
+use error::ScheduleGetError;
 use lambda::handler_fn;
+use repository::schedule::ScheduleRepository;
 use response::ok;
-use serde_json::{json, Value};
-
-extern crate rusoto_core;
-extern crate rusoto_dynamodb;
-
 use rusoto_core::Region;
 use rusoto_dynamodb::DynamoDbClient;
-
-mod error;
-use error::ScheduleGetError;
-use repository::schedule::ScheduleRepository;
+use serde_json::{json, Value};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

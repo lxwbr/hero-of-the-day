@@ -9,6 +9,7 @@ provider:
     HERO_TABLE: ${self:service}-${self:provider.stage}-hero
     SCHEDULE_TABLE: ${self:service}-${self:provider.stage}-schedule
     USER_TABLE: ${self:service}-${self:provider.stage}-user
+    SLACK_TOKEN_PARAMETER: /${self:service}-${self:provider.stage}/slack-token
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     HOSTED_DOMAIN: ${env:HOSTED_DOMAIN}
   iamRoleStatements:
@@ -19,6 +20,10 @@ provider:
         - "Fn::GetAtt": [ HeroTable, Arn ]
         - "Fn::GetAtt": [ ScheduleTable, Arn ]
         - "Fn::GetAtt": [ UserTable, Arn ]
+    - Effect: Allow
+      Action:
+        - ssm:GetParameter
+      Resource: arn:aws:ssm:*:*:parameter/${self:service}-${self:provider.stage}/*
 
 custom:
   rust:
@@ -34,6 +39,7 @@ plugins:
 functions:
   hero-list:
     handler: hero-list
+    description: Provides a list of possible hero handles. Each of the heros can contain several slack members.
     events:
       - http:
           path: hero/list
@@ -46,6 +52,7 @@ functions:
             type: token
   schedule-get:
     handler: schedule-get
+    description: Returns a schedule for provided hero.
     events:
       - http:
           path: schedule/{hero}
@@ -58,6 +65,7 @@ functions:
             type: token
   schedule-update:
     handler: schedule-update
+    description: Updates a schedule for provided hero.
     events:
       - http:
           path: schedule/{hero}
@@ -70,6 +78,7 @@ functions:
             type: token
   user-create:
     handler: user-create
+    description: Creates a user who can be assigned as a hero.
     events:
       - http:
           path: user
@@ -80,8 +89,12 @@ functions:
             resultTtlInSeconds: 0
             identitySource: method.request.header.Authorization
             type: token
+  slack-usergroup-users-update:
+    handler: slack-usergroup-users-update
+    description: Updates the user membership for all heros in slack.
   custom-authorizer:
     handler: custom-authorizer
+    description: Checks if the user is allowed to execute one of the above lambdas.
 
 resources:
   Resources:
@@ -103,6 +116,7 @@ resources:
         ResponseType: DEFAULT_5XX
         RestApiId:
           Ref: 'ApiGatewayRestApi'
+    # Contains all the heroes (slack handles) which can be assigned to users.
     HeroTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -116,6 +130,7 @@ resources:
         SSESpecification:
           SSEEnabled: true
         TableName: !Sub ${self:provider.environment.HERO_TABLE}
+    # Contains schedules. A schedule is a planned shift start for user to be assigned to be a hero.
     ScheduleTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -133,6 +148,7 @@ resources:
         SSESpecification:
           SSEEnabled: true
         TableName: !Sub ${self:provider.environment.SCHEDULE_TABLE}
+    # Contains all the e-mail addresses of users who have logged in or been assigned to a hero.
     UserTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -146,3 +162,11 @@ resources:
         SSESpecification:
           SSEEnabled: true
         TableName: !Sub ${self:provider.environment.USER_TABLE}
+    # Needs to contain the Slack token in order to do respective API calls.
+    SlackTokenParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: !Sub ${self:provider.environment.SLACK_TOKEN_PARAMETER}
+        Type: String
+        Value: "Set this parameter to the slack token for updating usergroups."
+        Description: Slack token for update operations on usergroups.

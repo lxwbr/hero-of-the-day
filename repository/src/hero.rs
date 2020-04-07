@@ -1,8 +1,9 @@
-use model::hero::Hero;
-use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput, UpdateItemInput};
-use std::env;
-
 use maplit::hashmap;
+use model::hero::Hero;
+use rusoto_dynamodb::{
+    AttributeValue, DynamoDb, DynamoDbClient, GetItemInput, ScanInput, UpdateItemInput,
+};
+use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -42,6 +43,27 @@ impl HeroRepository<'_> {
         );
 
         Ok(hero)
+    }
+
+    pub async fn list_names(self) -> Result<Vec<String>, Error> {
+        let scan_input = ScanInput {
+            table_name: self.table_name,
+            projection_expression: Some("#n".to_string()),
+            expression_attribute_names: Some(hashmap! {
+                "#n".to_string() => "name".to_string()
+            }),
+            ..Default::default()
+        };
+        let names: Vec<String> = self
+            .client
+            .scan(scan_input)
+            .await?
+            .items
+            .unwrap()
+            .into_iter()
+            .map(|hm| hm["name"].s.as_ref().unwrap().to_string())
+            .collect();
+        Ok(names)
     }
 
     pub async fn append_members(

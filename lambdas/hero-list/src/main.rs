@@ -1,17 +1,13 @@
+mod error;
+
+use error::HeroListError;
 use lambda::handler_fn;
 use model::hero::Hero;
 use response::ok;
-use serde_json::{json, Value};
-use std::env;
-
-extern crate rusoto_core;
-extern crate rusoto_dynamodb;
-
 use rusoto_core::Region;
 use rusoto_dynamodb::{DynamoDb, DynamoDbClient, ScanInput};
-
-mod error;
-use error::HeroListError;
+use serde_json::{json, Value};
+use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

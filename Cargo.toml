@@ -1,2 +1,12 @@
 [workspace]
-members = ["lambdas/hero-list", "lambdas/custom-authorizer", "lambdas/schedule-get", "lambdas/user-create", "lambdas/schedule-update", "repository", "response", "model"]
+members = [
+    "lambdas/hero-list",
+    "lambdas/custom-authorizer",
+    "lambdas/schedule-get",
+    "lambdas/user-create",
+    "lambdas/schedule-update",
+    "lambdas/slack-usergroup-users-update",
+    "repository",
+    "response",
+    "model"
+]
