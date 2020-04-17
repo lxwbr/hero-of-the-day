@@ -41,17 +41,29 @@ impl ScheduleRepository<'_> {
         }
     }
 
-    pub async fn get(self, hero: String) -> Result<Vec<Schedule>, Error> {
-        let attribute_values = hashmap! {
+    pub async fn get(self, hero: String, shift_start_time: Option<i64>) -> Result<Vec<Schedule>, Error> {
+        let mut attribute_values = hashmap! {
             ":hero".to_owned() => AttributeValue {
                 s: Some(hero),
                 ..Default::default()
             }
         };
 
+        let mut key_condition_expression = "hero = :hero".to_string();
+
+        if let Some(time) = shift_start_time {
+            attribute_values.insert(
+                ":shift_start_time".to_owned(), AttributeValue {
+                    n: Some(time.to_string()),
+                    ..Default::default()
+                }
+            );
+            key_condition_expression = format!("{} AND shift_start_time = :shift_start_time", key_condition_expression);
+        }
+
         let query_input = QueryInput {
             table_name: self.table_name,
-            key_condition_expression: Some("hero = :hero".to_string()),
+            key_condition_expression: Some(key_condition_expression),
             expression_attribute_values: Some(attribute_values),
             ..Default::default()
         };

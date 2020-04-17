@@ -8,5 +8,6 @@ members = [
     "lambdas/slack-usergroup-users-update",
     "repository",
     "response",
+    "slack",
     "model"
 ]

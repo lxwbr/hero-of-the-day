@@ -1,6 +1,9 @@
+#![type_length_limit="1126348"]
+
 mod error;
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use error::ScheduleUpdateError;
 use lambda::handler_fn;
 use repository::{
@@ -11,6 +14,7 @@ use response::{bad_request, ok};
 use rusoto_core::Region;
 use rusoto_dynamodb::DynamoDbClient;
 use serde_json::{from_str, json, Value};
+use slack;
 use std::str::FromStr;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -25,8 +29,6 @@ async fn main() -> Result<(), Error> {
 async fn func(event: Value) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
 
-    let schedule_repository = ScheduleRepository::new(&client);
-
     let hero = event["pathParameters"]["hero"]
         .as_str()
         .ok_or(ScheduleUpdateError::HeroParameterMissing)?
@@ -38,12 +40,23 @@ async fn func(event: Value) -> Result<Value, Error> {
             .as_str()
             .expect("`shift_start_time` has to be a rfc3339 string"),
     )
-    .unwrap();
+    .unwrap()
+    .with_timezone(&Utc);
 
-    // TODO: make local time part of input params
-    let today_start = Local::today().and_hms(0, 0, 0);
+    let user_timezone = body["timezone"]
+        .as_str()
+        .expect("Expected `timezone`, e.g. Europe/Berlin");
 
-    if shift_start_time.le(&today_start) {
+    let today_start = midnight(user_timezone);
+
+    println!("shift_start_time: {}", shift_start_time);
+    println!("today_start: {}", today_start);
+
+    let duration = shift_start_time
+        .signed_duration_since(today_start)
+        .num_seconds();
+
+    if duration < 0 {
         let message = json!({
             "message":
                 format!(
@@ -72,7 +85,8 @@ async fn func(event: Value) -> Result<Value, Error> {
         )
         .expect("`operation` has to be of type ADD or DELETE");
 
-        let schedule = schedule_repository
+        let schedule_repository = ScheduleRepository::new(&client);
+        let schedule_option = schedule_repository
             .update_assignees(
                 &operation,
                 hero.clone(),
@@ -81,14 +95,32 @@ async fn func(event: Value) -> Result<Value, Error> {
             )
             .await?;
 
-        println!("Updated the schedule: {:?}", schedule);
+        println!("Updated the schedule: {:?}", schedule_option);
 
         // If it is an ADD operation, update the hero table to include the e-mail address to the members list.
         if let Operation::Add = operation {
             let hero_repository = HeroRepository::new(&client);
-            hero_repository.append_members(hero, assignees).await?;
+            hero_repository.append_members(hero.to_string(), assignees).await?;
         }
 
-        Ok(ok(json!(schedule).to_string()))
+        if duration == 0 {
+            // Need to load the rest of the users for that day
+            match ScheduleRepository::new(&client).get_first_before(hero, shift_start_time.timestamp() as u64).await? {
+                Some(schedule) => slack::Client::new(slack::get_slack_token().await?)
+                    .usergroups_users_update_with_schedules(vec!(schedule))
+                    .await?,
+                None => ()
+            }
+        }
+
+        Ok(ok(json!(()).to_string()))
     }
+}
+
+fn midnight(timezone: &str) -> DateTime<Tz> {
+    let tz: Tz = timezone.parse().unwrap();
+    Utc::now()
+        .with_timezone(&tz)
+        .date()
+        .and_hms(0, 0, 0)
 }

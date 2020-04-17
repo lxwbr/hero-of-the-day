@@ -1,3 +1,5 @@
+#![type_length_limit="1124188"]
+
 mod error;
 
 use error::ScheduleGetError;
@@ -25,7 +27,7 @@ async fn func(event: Value) -> Result<Value, Error> {
         .as_str()
         .ok_or(ScheduleGetError::HeroParameterMissing)?;
 
-    let schedules = repository.get(hero.to_string()).await?;
+    let schedules = repository.get(hero.to_string(), None).await?;
 
     Ok(ok(json!(schedules).to_string()))
 }
