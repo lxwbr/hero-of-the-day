@@ -8,6 +8,7 @@ provider:
   environment:
     HERO_TABLE: ${self:service}-${self:provider.stage}-hero
     SCHEDULE_TABLE: ${self:service}-${self:provider.stage}-schedule
+    TIMETABLE_TABLE: ${self:service}-${self:provider.stage}-timetable
     USER_TABLE: ${self:service}-${self:provider.stage}-user
     SLACK_TOKEN_PARAMETER: /${self:service}-${self:provider.stage}/slack-token
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
@@ -27,7 +28,7 @@ provider:
 
 custom:
   rust:
-    dockerTag: '0.2.6-rust-1.41.0'
+    dockerTag: '0.2.7-rust-1.44.1'
 
 package:
   individually: true
@@ -43,6 +44,19 @@ functions:
     events:
       - http:
           path: hero/list
+          method: get
+          cors: true
+          authorizer:
+            name: custom-authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+  hero-get:
+    handler: hero-get
+    description: Returns hero information with members for provided hero.
+    events:
+      - http:
+          path: hero/{hero}
           method: get
           cors: true
           authorizer:
@@ -148,6 +162,20 @@ resources:
         SSESpecification:
           SSEEnabled: true
         TableName: !Sub ${self:provider.environment.SCHEDULE_TABLE}
+    # Contains schedules. A schedule is a planned shift start for user to be assigned to be a hero.
+    TimetableTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        SSESpecification:
+          SSEEnabled: true
+        TableName: !Sub ${self:provider.environment.TIMETABLE_TABLE}
     # Contains all the e-mail addresses of users who have logged in or been assigned to a hero.
     UserTable:
       Type: AWS::DynamoDB::Table

@@ -13,7 +13,7 @@
   "homepage": "https://github.com/lxwbr/hero-of-the-day#readme",
   "devDependencies": {
     "serverless": "1.67.0",
-    "serverless-rust": "0.3.7",
+    "serverless-rust": "0.3.8",
     "serverless-pseudo-parameters": "2.5.0"
   }
 }

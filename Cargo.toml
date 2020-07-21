@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lambdas/hero-list",
+    "lambdas/hero-get",
     "lambdas/custom-authorizer",
     "lambdas/schedule-get",
     "lambdas/user-create",
