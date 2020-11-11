@@ -78,6 +78,11 @@ async fn func(event: Value) -> Result<Value, Error> {
             })
             .collect();
 
+        let every_n_days = body["repeat_every_n_days"].as_i64();
+        if let Some(days) = every_n_days {
+            println!("Request to repeat every {:?} days", days);
+        }
+
         let operation = Operation::from_str(
             body["operation"]
                 .as_str()
