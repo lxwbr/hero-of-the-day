@@ -7,17 +7,17 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.2.21", features = ["full"] }
+tokio = { version = "1.2.0", features = ["full"] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rusoto_core = "0.44"
-rusoto_dynamodb = "0.44"
-rusoto_ssm = "0.44.0"
+rusoto_core = "0.46"
+rusoto_dynamodb = "0.46"
+rusoto_ssm = "0.46.0"
 response = { path = "../../response" }
 model = { path = "../../model" }
 repository = { path = "../../repository" }
-reqwest = { version = "0.10.4", features = ["json"] }
-futures = "0.3.4"
-async-std = { version = "1.5", features = ["attributes"] }
+reqwest = { version = "0.11.1", features = ["json"] }
+futures = "0.3.13"
+async-std = { version = "1.9", features = ["attributes"] }
 slack = { path = "../../slack" }
