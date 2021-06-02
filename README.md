@@ -1,6 +1,6 @@
 # hero-of-the-day
 
-This service integrates with Slack and makes scheduled assignments of users to user-groups possible.
+This service integrates with Slack and makes scheduled assignments and rotation of users to user-groups possible.
 
 ## Build
 
