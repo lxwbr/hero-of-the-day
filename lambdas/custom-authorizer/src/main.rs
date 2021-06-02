@@ -1,5 +1,5 @@
 use google_signin;
-use lambda::handler_fn;
+use lambda_runtime::{handler_fn, Context};
 use model::user::User;
 use repository::{hero::HeroRepository, user::UserRepository};
 use rusoto_core::Region;
@@ -13,11 +13,11 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let func = handler_fn(func);
-    lambda::run(func).await?;
+    lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(event: Value) -> Result<Value, Error> {
+async fn func(event: Value, _: Context) -> Result<Value, Error> {
     let google_client_id_env = "GOOGLE_CLIENT_ID";
     let hosted_domain_env = "HOSTED_DOMAIN";
 

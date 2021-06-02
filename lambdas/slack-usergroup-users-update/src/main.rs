@@ -1,7 +1,7 @@
 #![type_length_limit="1123558"]
 
 use futures::{prelude::*, stream::futures_unordered::FuturesUnordered};
-use lambda::handler_fn;
+use lambda_runtime::{handler_fn, Context};
 use repository::{hero::HeroRepository, schedule::ScheduleRepository};
 use rusoto_core::Region;
 use rusoto_dynamodb::DynamoDbClient;
@@ -14,11 +14,11 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let func = handler_fn(func);
-    lambda::run(func).await?;
+    lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(_event: Value) -> Result<(), Error> {
+async fn func(_event: Value, _: Context) -> Result<(), Error> {
     let dynamodb_client = DynamoDbClient::new(Region::default());
     let hero_repository = HeroRepository::new(&dynamodb_client);
     let hero_names = hero_repository.list_names().await?;
