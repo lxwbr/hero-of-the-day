@@ -2,6 +2,14 @@
 
 This service integrates with Slack and makes scheduled assignments of users to user-groups possible.
 
+## Build
+
+In the root directory:
+
+```
+cargo build
+```
+
 ## Deployment
 
 ```
