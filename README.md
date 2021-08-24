@@ -13,5 +13,5 @@ cargo build
 ## Deployment
 
 ```
-GOOGLE_CLIENT_ID="XXXXXXXXXXXX.apps.googleusercontent.com" HOSTED_DOMAIN="your-domain.io" serverless deploy
+MS_CLIENT_ID="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" GOOGLE_CLIENT_ID="XXXXXXXXXXXX.apps.googleusercontent.com" HOSTED_DOMAIN="your-domain.io" serverless deploy
 ```

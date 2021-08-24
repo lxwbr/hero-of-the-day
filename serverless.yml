@@ -11,6 +11,7 @@ provider:
     TIMETABLE_TABLE: ${self:service}-${self:provider.stage}-timetable
     USER_TABLE: ${self:service}-${self:provider.stage}-user
     SLACK_TOKEN_PARAMETER: /${self:service}-${self:provider.stage}/slack-token
+    MS_CLIENT_ID: ${env:MS_CLIENT_ID}
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     HOSTED_DOMAIN: ${env:HOSTED_DOMAIN}
   iamRoleStatements:
@@ -28,7 +29,7 @@ provider:
 
 custom:
   rust:
-    dockerTag: '0.2.7-rust-1.44.1'
+    dockerTag: '0.3.0-rust-1.45.0'
 
 package:
   individually: true

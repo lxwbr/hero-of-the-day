@@ -1,4 +1,4 @@
-use google_signin;
+use google_jwt_verify;
 use lambda_runtime::{handler_fn, Context};
 use model::user::User;
 use repository::{hero::HeroRepository, user::UserRepository};
@@ -7,59 +7,97 @@ use rusoto_dynamodb::DynamoDbClient;
 use serde_json::{json, Value};
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
+use jsonwebtoken::{dangerous_insecure_decode};
+use serde::{Serialize, Deserialize};
+use azure_jwt::*;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    iss: String,         // Optional. Issuer
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let func = handler_fn(func);
+    let func = handler_fn(func_with_context);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(event: Value, _: Context) -> Result<Value, Error> {
-    let google_client_id_env = "GOOGLE_CLIENT_ID";
-    let hosted_domain_env = "HOSTED_DOMAIN";
+async fn func_with_context(event: Value, _: Context) -> Result<Value, Error> {
+    func(event).await
+}
 
-    let google_client_id = env::var(google_client_id_env)
-        .expect("Expected environment variable GOOGLE_CLIENT_ID not set");
-    let hosted_domain =
-        env::var(hosted_domain_env).expect("Expected environment variable HOSTED_DOMAIN not set");
-
-    let mut client = google_signin::Client::new();
-    client.audiences.push(google_client_id.clone());
-    client.hosted_domains.push(hosted_domain.clone());
-
+async fn func(event: Value) -> Result<Value, Error> {
     // This will slice out the `Bearer ` part of the authorization token
     let id_token = &event["authorizationToken"]
         .as_str()
         .expect("Expected authorizationToken to be part of the event")[7..];
+
     let method_arn = event["methodArn"]
         .as_str()
         .expect("Expected methodArn to be part of the event");
-    let id_info = client.verify(id_token).expect("Expected token to be valid");
-    println!("Success! Signed-in as {:?}", id_info.email);
 
-    let client = DynamoDbClient::new(Region::default());
+    let token_data = dangerous_insecure_decode::<Claims>(&id_token)?;
+    let dynamo_client = DynamoDbClient::new(Region::default());
+    println!("Logging in with iss: {:?}", token_data.claims.iss);
+    if token_data.claims.iss.contains("google") {
+        let google_client_id_env = "GOOGLE_CLIENT_ID";
 
-    logged_in(
-        &client,
-        id_info
-            .email
-            .to_owned()
-            .expect("id_info should have the email field"),
-    )
-    .await?;
+        let google_client_id = env::var(google_client_id_env)
+            .expect("Expected environment variable GOOGLE_CLIENT_ID not set");
 
-    check_user(&client, method_arn.to_owned(), id_info).await
+        let mut google_client = google_jwt_verify::Client::new(google_client_id.as_str());
+        let verified_token = google_client.verify_id_token(id_token).expect("Expected token to be valid");
+
+        let email = verified_token.get_payload().get_email();
+        println!("Signed-in as {:?}", email);
+
+        logged_in(
+            &dynamo_client,
+            email.to_owned(),
+        )
+            .await?;
+
+        check_user(&dynamo_client, method_arn.to_owned(), Info {
+            sub: verified_token.get_claims().get_subject(),
+            email
+        }).await
+    } else {
+        let aud = env::var("MS_CLIENT_ID")
+            .expect("Expected environment variable MS_CLIENT_ID not set");
+        let mut az_auth = AzureAuth::new(aud).unwrap();
+        let token = az_auth.validate_token(id_token).expect("Expected valid token");
+
+        println!("Signed-in as {:?}", token.claims.preferred_username);
+
+        logged_in(
+            &dynamo_client,
+            token.claims.preferred_username
+                .to_owned()
+                .expect("token claims should have the preferred_username field"),
+        )
+            .await?;
+
+        check_user(&dynamo_client, method_arn.to_owned(), Info {
+            sub: token.claims.sub,
+            email: token.claims.preferred_username.expect("token claims should have the preferred_username field")
+        }).await
+    }
+}
+
+struct Info {
+    sub: String,
+    email: String
 }
 
 async fn check_user(
     client: &DynamoDbClient,
     method_arn: String,
-    id_info: google_signin::IdInfo,
+    info: Info,
 ) -> Result<Value, Error> {
-    let sub = id_info.sub;
+    let sub = info.sub;
     let parts: Vec<&str> = method_arn.split("/").collect();
     let http_verb = parts[2];
     let resource = parts[3];
@@ -73,7 +111,7 @@ async fn check_user(
         } else {
             let repository = HeroRepository::new(client);
             let hero = repository.get(sub_resource.to_string()).await?;
-            let email = id_info.email.expect("id_info should have the email field");
+            let email = info.email;
             println!("email: {} in {:?}", email, hero.members);
             if hero.members.contains(&email) {
                 println!("ALLOW");
