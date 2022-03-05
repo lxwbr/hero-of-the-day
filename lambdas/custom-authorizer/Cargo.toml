@@ -11,5 +11,5 @@ serde_json = "1.0"
 google-signin = "0.3.0"
 model = { path = "../../model" }
 repository = { path = "../../repository" }
-rusoto_core = "0.46"
+rusoto_core = "0.47"
 rusoto_dynamodb = "0.46"

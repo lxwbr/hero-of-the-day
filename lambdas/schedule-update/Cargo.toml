@@ -11,7 +11,7 @@ tokio = { version = "1.2.0", features = ["full"] }
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rusoto_core = "0.46"
+rusoto_core = "0.47"
 rusoto_dynamodb = "0.46"
 response = { path = "../../response" }
 model = { path = "../../model" }
