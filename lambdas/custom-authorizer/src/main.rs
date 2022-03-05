@@ -1,5 +1,5 @@
 use google_jwt_verify;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use model::user::User;
 use repository::{hero::HeroRepository, user::UserRepository};
 use rusoto_core::Region;
@@ -20,22 +20,18 @@ struct Claims {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let func = handler_fn(func_with_context);
+    let func = service_fn(func);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func_with_context(event: Value, _: Context) -> Result<Value, Error> {
-    func(event).await
-}
-
-async fn func(event: Value) -> Result<Value, Error> {
+async fn func(event: LambdaEvent<Value>) -> Result<Value, Error> {
     // This will slice out the `Bearer ` part of the authorization token
-    let id_token = &event["authorizationToken"]
+    let id_token = &event.payload["authorizationToken"]
         .as_str()
         .expect("Expected authorizationToken to be part of the event")[7..];
 
-    let method_arn = event["methodArn"]
+    let method_arn = event.payload["methodArn"]
         .as_str()
         .expect("Expected methodArn to be part of the event");
 
@@ -48,7 +44,7 @@ async fn func(event: Value) -> Result<Value, Error> {
         let google_client_id = env::var(google_client_id_env)
             .expect("Expected environment variable GOOGLE_CLIENT_ID not set");
 
-        let mut google_client = google_jwt_verify::Client::new(google_client_id.as_str());
+        let google_client = google_jwt_verify::Client::new(google_client_id.as_str());
         let verified_token = google_client.verify_id_token(id_token).expect("Expected token to be valid");
 
         let email = verified_token.get_payload().get_email();

@@ -3,7 +3,7 @@
 mod error;
 
 use error::ScheduleGetError;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use repository::schedule::ScheduleRepository;
 use response::ok;
 use rusoto_core::Region;
@@ -14,16 +14,16 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let func = handler_fn(func);
+    let func = service_fn(func);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(event: Value, _: Context) -> Result<Value, Error> {
+async fn func(event: LambdaEvent<Value>) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
     let repository = ScheduleRepository::new(&client);
 
-    let hero = event["pathParameters"]["hero"]
+    let hero = event.payload["pathParameters"]["hero"]
         .as_str()
         .ok_or(ScheduleGetError::HeroParameterMissing)?;
 

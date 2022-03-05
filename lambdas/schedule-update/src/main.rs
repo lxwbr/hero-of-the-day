@@ -5,7 +5,7 @@ mod error;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use error::ScheduleUpdateError;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use repository::{
     hero::HeroRepository,
     schedule::{Operation, ScheduleRepository},
@@ -21,20 +21,20 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let func = handler_fn(func);
+    let func = service_fn(func);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(event: Value, _: Context) -> Result<Value, Error> {
+async fn func(event: LambdaEvent<Value>) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
 
-    let hero = event["pathParameters"]["hero"]
+    let hero = event.payload["pathParameters"]["hero"]
         .as_str()
         .ok_or(ScheduleUpdateError::HeroParameterMissing)?
         .to_string();
 
-    let body: Value = from_str(event["body"].as_str().unwrap())?;
+    let body: Value = from_str(event.payload["body"].as_str().unwrap())?;
     let shift_start_time = DateTime::parse_from_rfc3339(
         body["shift_start_time"]
             .as_str()

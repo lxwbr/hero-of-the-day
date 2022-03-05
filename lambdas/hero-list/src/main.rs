@@ -1,7 +1,7 @@
 mod error;
 
 use error::HeroListError;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use model::hero::Hero;
 use response::ok;
 use rusoto_core::Region;
@@ -13,12 +13,12 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let func = handler_fn(func);
+    let func = service_fn(func);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
-async fn func(_event: Value, _: Context) -> Result<Value, Error> {
+async fn func(_event: LambdaEvent<Value>) -> Result<Value, Error> {
     let client = DynamoDbClient::new(Region::default());
 
     let scan_input = ScanInput {
