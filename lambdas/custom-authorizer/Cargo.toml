@@ -12,4 +12,4 @@ google-signin = "0.3.0"
 model = { path = "../../model" }
 repository = { path = "../../repository" }
 rusoto_core = "0.46"
-rusoto_dynamodb = "0.46"
+rusoto_dynamodb = "0.47"
