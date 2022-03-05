@@ -13,6 +13,6 @@ model = { path = "../../model" }
 repository = { path = "../../repository" }
 rusoto_core = "0.47"
 rusoto_dynamodb = "0.47"
-jsonwebtoken = "7.2.0"
+jsonwebtoken = "8.0.1"
 azure_jwt = "0.2.1"
 google-jwt-verify = "0.3.0"
