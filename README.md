@@ -1,17 +1,14 @@
-# hero-of-the-day
+# Welcome to your CDK TypeScript project
 
-This service integrates with Slack and makes scheduled assignments and rotation of users to user-groups possible.
+This is a blank project for CDK development with TypeScript.
 
-## Build
+The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-In the root directory:
+## Useful commands
 
-```
-cargo build
-```
-
-## Deployment
-
-```
-MS_CLIENT_ID="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" GOOGLE_CLIENT_ID="XXXXXXXXXXXX.apps.googleusercontent.com" HOSTED_DOMAIN="your-domain.io" serverless deploy
-```
+* `npm run build`   compile typescript to js
+* `npm run watch`   watch for changes and compile
+* `npm run test`    perform the jest unit tests
+* `cdk deploy`      deploy this stack to your default AWS account/region
+* `cdk diff`        compare deployed stack with current state
+* `cdk synth`       emits the synthesized CloudFormation template

@@ -2,11 +2,8 @@
 name = "model"
 version = "0.1.0"
 authors = ["Alex Weber <lexwbr@gmail.com>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-rusoto_dynamodb = "0.47"
-chrono = "0.4.11"
+aws-sdk-dynamodb = "0.19.0"
+serde = "1.0.145"

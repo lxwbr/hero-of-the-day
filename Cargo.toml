@@ -1,14 +1,10 @@
 [workspace]
 members = [
-    "lambdas/hero-list",
-    "lambdas/hero-get",
-    "lambdas/custom-authorizer",
-    "lambdas/schedule-get",
-    "lambdas/user-create",
-    "lambdas/schedule-update",
-    "lambdas/slack-usergroup-users-update",
-    "repository",
+    "migrate",
     "response",
-    "slack",
+    "authorizer",
+    "repository",
+    "hero-list",
+    "hero-get",
     "model"
 ]
