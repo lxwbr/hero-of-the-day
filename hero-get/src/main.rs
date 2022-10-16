@@ -1,4 +1,4 @@
-use lambda_http::{run, service_fn, Body, Error, Request, Response, RequestExt};
+use lambda_http::{run, service_fn, Error, Request, RequestExt};
 use repository::hero::HeroRepository;
 use response::{ok, bad_request};
 
@@ -15,13 +15,13 @@ async fn main() -> Result<(), Error> {
     let repository_ref = &HeroRepository::new(&shared_config);
 
     run(service_fn(move |event: Request| async move {
-        Ok::<Response<Body>, Error>(match event.path_parameters().first("hero") {
+        match event.path_parameters().first("hero") {
             Some(hero) => {
                 let hero = repository_ref.get(hero.into()).await?;
                 ok(hero)
             },
             _ => bad_request("Expected hero".into())
-        })
+        }
     })).await?;
     Ok(())
 }

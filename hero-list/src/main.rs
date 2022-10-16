@@ -1,4 +1,4 @@
-use lambda_http::{run, service_fn, Body, Error, Request, Response};
+use lambda_http::{run, service_fn, Error, Request};
 use model::hero::Hero;
 use repository::hero::HeroRepository;
 use response::ok;
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Error> {
     run(service_fn(move |_: Request| async move {
         let heroes: Vec<Hero> = repository_ref.list().await?;
         info!("Fetched {} heroes.", heroes.len());
-        Ok::<Response<Body>, Error>(ok(heroes))
+        ok(heroes)
     })).await?;
     Ok(())
 }
