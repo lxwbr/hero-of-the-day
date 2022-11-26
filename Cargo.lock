@@ -1324,6 +1324,7 @@ name = "model"
 version = "0.1.0"
 dependencies = [
  "aws-sdk-dynamodb",
+ "chrono",
  "serde",
 ]
 
