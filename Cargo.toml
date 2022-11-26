@@ -4,6 +4,7 @@ members = [
     "response",
     "authorizer",
     "repository",
+    "schedule-get",
     "hero-list",
     "hero-get",
     "user-create",

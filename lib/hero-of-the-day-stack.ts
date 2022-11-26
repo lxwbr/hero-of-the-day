@@ -10,7 +10,9 @@ const heroOfTheDay = 'hero-of-the-day'
 const environment = {
   "HERO_TABLE": `${heroOfTheDay}-hero`,
   "USER_TABLE": `${heroOfTheDay}-user`,
+  "SCHEDULE_TABLE": `${heroOfTheDay}-schedule`,
   "OLD_HERO_TABLE": 'hero-of-the-day-dev-hero',
+  "OLD_SCHEDULE_TABLE": 'hero-of-the-day-dev-schedule',
   "OLD_USER_TABLE": 'hero-of-the-day-dev-user',
   "HOSTED_DOMAIN": 'moia.io',
   "GOOGLE_CLIENT_ID": '356839337273-s4slmoo3nc0odhjsocbqs0fjra3lvn3v.apps.googleusercontent.com',
@@ -24,15 +26,17 @@ export class HeroOfTheDayStack extends Stack {
 
     let heroTable: ITable = this.heroTable();
     let userTable: ITable = this.userTable();
+    let scheduleTable: ITable = this.scheduleTable();
 
     let authorizer: IFunction = this.authorizer(heroTable, userTable);
     let heroListFn: IFunction = this.heroList(heroTable);
     let heroGetFn: IFunction = this.heroGet(heroTable);
     let userCreateFn: IFunction = this.userCreate(userTable);
+    let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
 
-    this.migrate(heroTable, userTable);
+    this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn);
   }
 
   heroTable(): ITable {
@@ -59,6 +63,22 @@ export class HeroOfTheDayStack extends Stack {
     return table;
   }
 
+  scheduleTable(): ITable {
+    let table = new dynamodb.Table(this, environment.SCHEDULE_TABLE, {
+      tableName: environment.SCHEDULE_TABLE,
+      partitionKey: {
+        name: 'hero',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'shift_start_time',
+        type: AttributeType.NUMBER
+      },
+      billingMode: BillingMode.PAY_PER_REQUEST
+    });
+    return table;
+  }
+
   createFn(id: string, name: string): IFunction {
     return new RustFunction(this, id, {
       package: name,
@@ -67,15 +87,18 @@ export class HeroOfTheDayStack extends Stack {
     });
   }
 
-  migrate(heroTable: ITable, userTable: ITable): IFunction {
+  migrate(heroTable: ITable, userTable: ITable, scheduleTable: ITable): IFunction {
     let oldHeroTable = Table.fromTableArn(this, 'OldHeroTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_HERO_TABLE}`);
     let oldUserTable = Table.fromTableArn(this, 'OldUserTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_USER_TABLE}`);
+    let oldScheduleTable = Table.fromTableArn(this, 'OldScheduleTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_SCHEDULE_TABLE}`);
 
     let fn = this.createFn('MigrateFunction', 'migrate');
     heroTable.grantReadWriteData(fn);
     userTable.grantReadWriteData(fn);
+    scheduleTable.grantReadWriteData(fn);
     oldHeroTable.grantReadData(fn);
     oldUserTable.grantReadData(fn);
+    oldScheduleTable.grantReadData(fn);
     return fn;
   }
 
@@ -104,7 +127,13 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
-  apiGateway(authorizerFn: IFunction, heroListFn: IFunction, heroGetFn: IFunction, userCreateFn: IFunction) {
+  scheduleGet(table: ITable): IFunction {
+    let fn = this.createFn('ScheduleGetFunction', 'schedule-get');
+    table.grantReadData(fn);
+    return fn;
+  } 
+
+  apiGateway(authorizerFn: IFunction, heroListFn: IFunction, heroGetFn: IFunction, userCreateFn: IFunction, scheduleGetFn: IFunction) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
       defaultCorsPreflightOptions: {
@@ -121,6 +150,7 @@ export class HeroOfTheDayStack extends Stack {
 
     let heroPath = api.root.addResource('hero');
     let userPath = api.root.addResource('user');
+    let schedulePath = api.root.addResource('schedule');
 
     let authorizer = new apigw.TokenAuthorizer(this, 'HeroOfTheDayCustomAuthorizer', {
       handler: authorizerFn,
@@ -146,6 +176,14 @@ export class HeroOfTheDayStack extends Stack {
 
     userPath.addResource('{user}').addMethod('PUT',
       new apigw.LambdaIntegration(userCreateFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
+    schedulePath.addResource('{schedule}').addMethod('GET',
+      new apigw.LambdaIntegration(heroGetFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM

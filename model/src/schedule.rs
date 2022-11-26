@@ -14,7 +14,7 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    pub fn from_dynamo_item(item: HashMap<String, AttributeValue>) -> Schedule {
+    pub fn from_dynamo_item(item: &HashMap<String, AttributeValue>) -> Schedule {
         Schedule {
             hero: item["hero"]
                 .as_s()
