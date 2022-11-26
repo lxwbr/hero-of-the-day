@@ -182,8 +182,8 @@ export class HeroOfTheDayStack extends Stack {
       }
     )
 
-    schedulePath.addResource('{schedule}').addMethod('GET',
-      new apigw.LambdaIntegration(heroGetFn, { proxy: true }), 
+    schedulePath.addResource('{hero}').addMethod('GET',
+      new apigw.LambdaIntegration(scheduleGetFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM
