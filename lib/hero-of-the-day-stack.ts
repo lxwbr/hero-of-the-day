@@ -5,7 +5,6 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
 import { AttributeType, BillingMode, ITable, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
-import { PassthroughBehavior } from 'aws-cdk-lib/aws-apigateway';
 
 const heroOfTheDay = 'hero-of-the-day'
 const environment = {
@@ -14,8 +13,8 @@ const environment = {
   "OLD_HERO_TABLE": 'hero-of-the-day-dev-hero',
   "OLD_USER_TABLE": 'hero-of-the-day-dev-user',
   "HOSTED_DOMAIN": 'moia.io',
-  "GOOGLE_CLIENT_ID": 'GOOGLE_CLIENT_ID',
-  "MS_CLIENT_ID": 'MS_CLIENT_ID',
+  "GOOGLE_CLIENT_ID": '356839337273-s4slmoo3nc0odhjsocbqs0fjra3lvn3v.apps.googleusercontent.com',
+  "MS_CLIENT_ID": 'aec83053-579c-4646-812e-cfa7d97ad9a0',
   "SLACK_TOKEN_PARAMETER": '/hero-of-the-day-dev/slack-token'
 }
 
@@ -29,10 +28,11 @@ export class HeroOfTheDayStack extends Stack {
     let authorizer: IFunction = this.authorizer(heroTable, userTable);
     let heroListFn: IFunction = this.heroList(heroTable);
     let heroGetFn: IFunction = this.heroGet(heroTable);
+    let userCreateFn: IFunction = this.userCreate(userTable);
 
     this.migrate(heroTable, userTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn);
   }
 
   heroTable(): ITable {
@@ -98,7 +98,13 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
-  apiGateway(authorizerFn: IFunction, heroListFn: IFunction, heroGetFn: IFunction) {
+  userCreate(table: ITable): IFunction {
+    let fn = this.createFn('UserCreateFunction', 'user-create');
+    table.grantReadWriteData(fn);
+    return fn;
+  }
+
+  apiGateway(authorizerFn: IFunction, heroListFn: IFunction, heroGetFn: IFunction, userCreateFn: IFunction) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
       defaultCorsPreflightOptions: {
@@ -114,48 +120,13 @@ export class HeroOfTheDayStack extends Stack {
     new CfnOutput(this, 'apiUrl', { value: api.url });
 
     let heroPath = api.root.addResource('hero');
+    let userPath = api.root.addResource('user');
 
     let authorizer = new apigw.TokenAuthorizer(this, 'HeroOfTheDayCustomAuthorizer', {
       handler: authorizerFn,
       resultsCacheTtl: Duration.minutes(0),
       authorizerName: `${heroOfTheDay}-authorizer`
     })
-    /*
-    const method = api.root.addMethod('OPTIONS', new apigw.MockIntegration({
-      integrationResponses: [
-        {
-          statusCode: "200",
-          responseParameters: {
-            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-            "method.response.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'",
-            "method.response.header.Access-Control-Allow-Origin": "'*'"
-          },
-          responseTemplates: {
-            "application/json": ""
-          }
-        }
-      ],
-      passthroughBehavior: apigw.PassthroughBehavior.NEVER,
-      requestTemplates: {
-        "application/json": "{\"statusCode\": 200}"
-      },
-    }));
-    
-    // since "methodResponses" is not supported by apigw.Method (https://github.com/awslabs/aws-cdk/issues/905)
-    // we will need to use an escape hatch to override the property
-    
-    method.addMethodResponse({
-      statusCode: '200',
-      responseModels: {
-        'application/json': apigw.Model.EMPTY_MODEL
-      },
-      responseParameters: {
-        'method.response.header.Access-Control-Allow-Headers': true,
-        'method.response.header.Access-Control-Allow-Methods': true,
-        'method.response.header.Access-Control-Allow-Origin': true
-      }
-    });
-     */
 
     heroPath.addResource('list').addMethod('GET',
       new apigw.LambdaIntegration(heroListFn, { proxy: true }),
@@ -167,6 +138,14 @@ export class HeroOfTheDayStack extends Stack {
 
     heroPath.addResource('{hero}').addMethod('GET',
       new apigw.LambdaIntegration(heroGetFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
+    userPath.addResource('{user}').addMethod('PUT',
+      new apigw.LambdaIntegration(userCreateFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM
