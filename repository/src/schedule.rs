@@ -114,4 +114,32 @@ impl ScheduleRepository {
             Ok(Some(schedule))
         }
     }
+
+    pub async fn get_first_before(
+        &self,
+        hero: String,
+        timestamp: u64,
+    ) -> Result<Option<Schedule>, Error> {
+        let schedules: Vec<Schedule> = self
+            .client
+            .query()
+            .table_name(&self.table_name)
+            .key_condition_expression("hero = :h AND shift_start_time <= :s")
+            .expression_attribute_values(":s", AttributeValue::N(timestamp.to_string()))
+            .expression_attribute_values(":h", AttributeValue::S(hero))
+            .scan_index_forward(false)
+            .limit(1)
+            .send()
+            .await?
+            .items
+            .unwrap()
+            .into_iter()
+            .map(|item| Schedule::from_dynamo_item(&item))
+            .collect();
+        if schedules.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(schedules.into_iter().nth(0).unwrap()))
+        }
+    }
 }
