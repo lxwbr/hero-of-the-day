@@ -5,6 +5,8 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
 import { AttributeType, BillingMode, ITable, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
+import { IRule, Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 
 const heroOfTheDay = 'hero-of-the-day'
 const environment = {
@@ -36,9 +38,20 @@ export class HeroOfTheDayStack extends Stack {
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable);
     let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable);
 
+    this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
+
     this.migrate(heroTable, userTable, scheduleTable);
 
     this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn);
+  }
+
+  slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
+    let rule = new Rule(this, 'SlackUsergroupUsersUpdateScheduleRule', {
+      schedule: Schedule.cron({ minute: '0', hour: '0' }),
+      targets: [new LambdaFunction(slackUsergroupUsersUpdateFn)],
+     });
+
+    return rule;
   }
 
   heroTable(): ITable {
