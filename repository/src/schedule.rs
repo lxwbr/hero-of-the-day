@@ -142,4 +142,31 @@ impl ScheduleRepository {
             Ok(Some(schedules.into_iter().nth(0).unwrap()))
         }
     }
+
+    pub async fn list(&self) -> Result<Vec<Schedule>, Error> {
+        let response = self.client
+            .scan()
+            .table_name(&self.table_name)
+            .send()
+            .await?;
+        let heroes: Vec<Schedule> = response
+            .items()
+            .unwrap_or_default()
+            .into_iter()
+            .map(Schedule::from_dynamo_item)
+            .collect();
+        Ok(heroes)
+    }
+
+    pub async fn put(&self, schedule: &Schedule) -> Result<(), Error> {
+        self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .item("hero", AttributeValue::S(schedule.hero.to_string()))
+            .item("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
+            .item("assignees", AttributeValue::Ss(schedule.assignees.clone()))
+            .send()
+            .await?;
+        Ok(())
+    }
 }
