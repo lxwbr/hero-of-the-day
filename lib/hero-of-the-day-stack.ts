@@ -196,16 +196,16 @@ export class HeroOfTheDayStack extends Stack {
       }
     )
 
-    schedulePath.addResource('{hero}').addMethod('GET',
-      new apigw.LambdaIntegration(scheduleGetFn, { proxy: true }), 
+    const heroResource = schedulePath.addResource('{hero}');
+
+    heroResource.addMethod('GET', new apigw.LambdaIntegration(scheduleGetFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM
       }
     )
 
-    schedulePath.addResource('{hero}').addMethod('POST',
-      new apigw.LambdaIntegration(scheduleUpdateFn, { proxy: true }), 
+    heroResource.addMethod('POST', new apigw.LambdaIntegration(scheduleUpdateFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM
