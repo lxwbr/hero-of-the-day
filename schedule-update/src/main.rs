@@ -8,6 +8,7 @@ use serde::{Deserialize};
 use serde_json::{json};
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
+use slack;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -67,6 +68,16 @@ async fn main() -> Result<(), Error> {
                             // If it is an ADD operation, update the hero table to include the e-mail address to the members list.
                             if let Operation::Add = operation {
                                 hero_repository_ref.append_members(hero.to_string(), payload.assignees).await?;
+                            }
+
+                            if duration == 0 {
+                                // Need to load the rest of the users for that day
+                                match schedule_repository_ref.get_first_before(hero.to_string(), shift_start_time.timestamp() as u64).await? {
+                                    Some(schedule) => slack::Client::new(slack::get_slack_token().await?)
+                                        .usergroups_users_update_with_schedules(vec!(schedule))
+                                        .await?,
+                                    None => ()
+                                }
                             }
 
                             ok(())

@@ -206,6 +206,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-ssm"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "694c5957ffa0aafecbd0885e806b43ccdc8056eeb25e9248977d7deacb203eed"
+dependencies = [
+ "aws-endpoint 0.49.0",
+ "aws-http 0.49.0",
+ "aws-sig-auth 0.49.0",
+ "aws-smithy-async 0.49.0",
+ "aws-smithy-client 0.49.0",
+ "aws-smithy-http 0.49.0",
+ "aws-smithy-http-tower 0.49.0",
+ "aws-smithy-json 0.49.0",
+ "aws-smithy-types 0.49.0",
+ "aws-types 0.49.0",
+ "bytes 1.2.1",
+ "fastrand",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-sso"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2112,6 +2135,7 @@ dependencies = [
  "response",
  "serde",
  "serde_json",
+ "slack",
  "tokio 1.21.2",
  "tracing",
  "tracing-subscriber",
@@ -2259,6 +2283,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "slack"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-ssm",
+ "futures",
+ "model",
+ "reqwest 0.11.12",
+ "serde",
+]
+
+[[package]]
+name = "slack-usergroup-users-update"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "slack",
+ "tokio 1.21.2",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

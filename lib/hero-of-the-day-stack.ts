@@ -34,6 +34,7 @@ export class HeroOfTheDayStack extends Stack {
     let userCreateFn: IFunction = this.userCreate(userTable);
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable);
+    let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
@@ -138,7 +139,13 @@ export class HeroOfTheDayStack extends Stack {
     let fn = this.createFn('ScheduleUpdateFunction', 'schedule-update');
     table.grantReadWriteData(fn);
     return fn;
-  } 
+  }
+
+  slackUsergroupUsersUpdate(table: ITable): IFunction {
+    let fn = this.createFn('SlackUsergroupUsersUpdateFunction', 'slack-usergroup-users-update');
+    table.grantReadData(fn);
+    return fn;
+  }
 
   apiGateway(
     authorizerFn: IFunction,

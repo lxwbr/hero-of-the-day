@@ -6,6 +6,8 @@ members = [
     "repository",
     "schedule-get",
     "schedule-update",
+    "slack",
+    "slack-usergroup-users-update",
     "hero-list",
     "hero-get",
     "user-create",
