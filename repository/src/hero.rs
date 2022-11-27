@@ -1,6 +1,6 @@
 use aws_config::SdkConfig;
 use model::hero::Hero;
-use aws_sdk_dynamodb::{Client, model::{AttributeValue}};
+use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -61,38 +61,21 @@ impl HeroRepository {
             .await?;
         Ok(())
     }
-/*
+
     pub async fn append_members(
-        self,
+        &self,
         hero: String,
         members: Vec<String>,
     ) -> Result<Vec<String>, Error> {
-        let key = hashmap! {
-            "name".to_string() => AttributeValue {
-                s: Some(hero.clone()),
-                ..Default::default()
-            }
-        };
-
-        let expression_attribute_values = hashmap! {
-            ":m".to_string() => AttributeValue {
-                ss: Some(members),
-                ..Default::default()
-            }
-        };
-
-        let update_item_input = UpdateItemInput {
-            table_name: self.table_name,
-            key,
-            update_expression: Some("ADD members :m".to_string()),
-            expression_attribute_values: Some(expression_attribute_values),
-            return_values: Some("UPDATED_NEW".to_string()),
-            ..Default::default()
-        };
-
         let attributes = self
             .client
-            .update_item(update_item_input)
+            .update_item()
+            .table_name(&self.table_name)
+            .key("name", AttributeValue::S(hero.clone()))
+            .expression_attribute_values(":m", AttributeValue::Ss(members))
+            .update_expression("ADD members :m")
+            .return_values(ReturnValue::UpdatedNew)
+            .send()
             .await?
             .attributes
             .expect("Expected attributes from the UpdateItemInput.");
@@ -100,12 +83,12 @@ impl HeroRepository {
         if attributes.is_empty() {
             Ok(Vec::new())
         } else {
-            let appended_members = attributes["members"].ss.as_ref().unwrap().to_vec();
+            let appended_members = attributes["members"].as_ss().unwrap().to_vec();
             println!(
                 "Following were added to the {} hero as members: {:?}",
                 hero, appended_members
             );
             Ok(appended_members)
         }
-    }*/
+    }
 }

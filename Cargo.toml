@@ -5,6 +5,7 @@ members = [
     "authorizer",
     "repository",
     "schedule-get",
+    "schedule-update",
     "hero-list",
     "hero-get",
     "user-create",

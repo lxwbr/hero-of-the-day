@@ -33,10 +33,11 @@ export class HeroOfTheDayStack extends Stack {
     let heroGetFn: IFunction = this.heroGet(heroTable);
     let userCreateFn: IFunction = this.userCreate(userTable);
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
+    let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn);
   }
 
   heroTable(): ITable {
@@ -133,7 +134,20 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   } 
 
-  apiGateway(authorizerFn: IFunction, heroListFn: IFunction, heroGetFn: IFunction, userCreateFn: IFunction, scheduleGetFn: IFunction) {
+  scheduleUpdate(table: ITable): IFunction {
+    let fn = this.createFn('ScheduleUpdateFunction', 'schedule-update');
+    table.grantReadWriteData(fn);
+    return fn;
+  } 
+
+  apiGateway(
+    authorizerFn: IFunction,
+    heroListFn: IFunction,
+    heroGetFn: IFunction,
+    userCreateFn: IFunction,
+    scheduleGetFn: IFunction,
+    scheduleUpdateFn: IFunction
+  ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
       defaultCorsPreflightOptions: {
@@ -184,6 +198,14 @@ export class HeroOfTheDayStack extends Stack {
 
     schedulePath.addResource('{hero}').addMethod('GET',
       new apigw.LambdaIntegration(scheduleGetFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
+    schedulePath.addResource('{hero}').addMethod('POST',
+      new apigw.LambdaIntegration(scheduleUpdateFn, { proxy: true }), 
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM

@@ -1,6 +1,6 @@
 use maplit::hashmap;
 use aws_config::SdkConfig;
-use aws_sdk_dynamodb::{Client, model::{AttributeValue}};
+use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use model::schedule::Schedule;
 use std::env;
 
@@ -72,5 +72,46 @@ impl ScheduleRepository {
             .map(Schedule::from_dynamo_item)
             .collect();
         Ok(schedules)
+    }
+
+    pub async fn update_assignees(
+        &self,
+        operation: &Operation,
+        hero: &String,
+        shift_start_time: i64,
+        assignees: Vec<String>,
+    ) -> Result<Option<Schedule>, Error> {
+        let update_expression = match operation {
+            Operation::Add => "ADD assignees :a".to_string(),
+            Operation::Delete => "DELETE assignees :a".to_string(),
+        };
+
+        let update_item_output = self.client
+            .update_item()
+            .table_name(&self.table_name)
+            .key("hero", AttributeValue::S(hero.clone()))
+            .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+            .update_expression(update_expression)
+            .expression_attribute_values(":a", AttributeValue::Ss(assignees))
+            .return_values(ReturnValue::AllNew)
+            .send()
+            .await?;
+
+        let schedule = Schedule::from_dynamo_item(
+            update_item_output.attributes().expect("Expected attributes from the UpdateItemInput."),
+        );
+
+        if schedule.assignees.is_empty() {
+            self.client
+                .delete_item()
+                .table_name(&self.table_name)
+                .key("hero", AttributeValue::S(hero.clone()))
+                .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+                .send()
+                .await?;
+            Ok(None)
+        } else {
+            Ok(Some(schedule))
+        }
     }
 }
