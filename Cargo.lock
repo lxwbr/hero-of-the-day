@@ -2303,7 +2303,7 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "futures",
- "lambda_http",
+ "lambda_runtime",
  "model",
  "repository",
  "response",

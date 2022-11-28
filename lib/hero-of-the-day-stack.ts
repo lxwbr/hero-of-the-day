@@ -7,6 +7,7 @@ import { AttributeType, BillingMode, ITable, Table } from 'aws-cdk-lib/aws-dynam
 import { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { IRule, Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
+import { IParameter, StringParameter } from 'aws-cdk-lib/aws-ssm';
 
 const heroOfTheDay = 'hero-of-the-day'
 const environment = {
@@ -19,7 +20,7 @@ const environment = {
   "HOSTED_DOMAIN": 'moia.io',
   "GOOGLE_CLIENT_ID": '356839337273-s4slmoo3nc0odhjsocbqs0fjra3lvn3v.apps.googleusercontent.com',
   "MS_CLIENT_ID": 'aec83053-579c-4646-812e-cfa7d97ad9a0',
-  "SLACK_TOKEN_PARAMETER": '/hero-of-the-day-dev/slack-token'
+  "SLACK_TOKEN_PARAMETER": `/${heroOfTheDay}/slack-token`
 }
 
 export class HeroOfTheDayStack extends Stack {
@@ -30,13 +31,15 @@ export class HeroOfTheDayStack extends Stack {
     let userTable: ITable = this.userTable();
     let scheduleTable: ITable = this.scheduleTable();
 
+    let slackParameter = StringParameter.fromStringParameterName(this, 'SlackParameter', environment.SLACK_TOKEN_PARAMETER);
+
     let authorizer: IFunction = this.authorizer(heroTable, userTable);
     let heroListFn: IFunction = this.heroList(heroTable);
     let heroGetFn: IFunction = this.heroGet(heroTable);
     let userCreateFn: IFunction = this.userCreate(userTable);
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
-    let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable);
-    let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable);
+    let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable, heroTable, slackParameter);
+    let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable, heroTable, slackParameter);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
@@ -94,11 +97,12 @@ export class HeroOfTheDayStack extends Stack {
     return table;
   }
 
-  createFn(id: string, name: string): IFunction {
+  createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
       package: name,
       environment,
-      functionName: `${heroOfTheDay}-${name}`
+      functionName: `${heroOfTheDay}-${name}`,
+      timeout
     });
   }
 
@@ -107,7 +111,7 @@ export class HeroOfTheDayStack extends Stack {
     let oldUserTable = Table.fromTableArn(this, 'OldUserTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_USER_TABLE}`);
     let oldScheduleTable = Table.fromTableArn(this, 'OldScheduleTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_SCHEDULE_TABLE}`);
 
-    let fn = this.createFn('MigrateFunction', 'migrate');
+    let fn = this.createFn('MigrateFunction', 'migrate', Duration.seconds(50));
     heroTable.grantReadWriteData(fn);
     userTable.grantReadWriteData(fn);
     scheduleTable.grantReadWriteData(fn);
@@ -148,15 +152,19 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   } 
 
-  scheduleUpdate(table: ITable): IFunction {
+  scheduleUpdate(scheduleTable: ITable, heroTable: ITable, slackParameter: IParameter): IFunction {
     let fn = this.createFn('ScheduleUpdateFunction', 'schedule-update');
-    table.grantReadWriteData(fn);
+    scheduleTable.grantReadWriteData(fn);
+    heroTable.grantReadWriteData(fn);
+    slackParameter.grantRead(fn);
     return fn;
   }
 
-  slackUsergroupUsersUpdate(table: ITable): IFunction {
-    let fn = this.createFn('SlackUsergroupUsersUpdateFunction', 'slack-usergroup-users-update');
-    table.grantReadData(fn);
+  slackUsergroupUsersUpdate(scheduleTable: ITable, heroTable: ITable, slackParameter: IParameter): IFunction {
+    let fn = this.createFn('SlackUsergroupUsersUpdateFunction', 'slack-usergroup-users-update', Duration.seconds(50));
+    scheduleTable.grantReadData(fn);
+    heroTable.grantReadData(fn);
+    slackParameter.grantRead(fn);
     return fn;
   }
 

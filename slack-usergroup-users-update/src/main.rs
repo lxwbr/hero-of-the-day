@@ -1,10 +1,13 @@
 use futures::{prelude::*, stream::futures_unordered::FuturesUnordered};
-use lambda_http::{run, service_fn, Error};
+use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use repository::schedule::ScheduleRepository;
 use repository::hero::HeroRepository;
-use response::{ok};
 use slack;
 use std::time::SystemTime;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct Request {}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -19,7 +22,7 @@ async fn main() -> Result<(), Error> {
     let schedule_repository_ref = &ScheduleRepository::new(&shared_config);
     let hero_repository_ref = &HeroRepository::new(&shared_config);
 
-    run(service_fn(move |_| async move {
+    run(service_fn(move |_: LambdaEvent<Request>| async move {
         let secs = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)?
             .as_secs();
@@ -48,7 +51,7 @@ async fn main() -> Result<(), Error> {
             .usergroups_users_update_with_schedules(schedules)
             .await?;
 
-        ok(())
+        Ok::<(), Error>(())
     })).await?;
     Ok(())
 }
