@@ -104,4 +104,19 @@ impl HeroRepository {
             Ok(appended_members)
         }
     }
+
+    pub async fn delete(
+        &self,
+        hero: String,
+    ) -> Result<(), Error> {
+        self
+            .client
+            .delete_item()
+            .table_name(&self.table_name)
+            .key("name", AttributeValue::S(hero.clone()))
+            .send()
+            .await?;
+
+        Ok(())
+    }
 }

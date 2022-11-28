@@ -42,12 +42,13 @@ export class HeroOfTheDayStack extends Stack {
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable, heroTable, slackParameter);
     let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable, heroTable, slackParameter);
     let heroMemberDeleteFn: IFunction = this.heroMemeberDelete(heroTable);
+    let heroDeleteFn: IFunction = this.heroDelete(heroTable, scheduleTable);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -182,6 +183,13 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
+  heroDelete(heroTable: ITable, scheduleTable: ITable): IFunction {
+    let fn = this.createFn('HeroDelete', 'hero-delete');
+    heroTable.grantReadWriteData(fn);
+    scheduleTable.grantReadWriteData(fn);
+    return fn;
+  }
+
   apiGateway(
     authorizerFn: IFunction,
     heroListFn: IFunction,
@@ -190,7 +198,8 @@ export class HeroOfTheDayStack extends Stack {
     scheduleGetFn: IFunction,
     scheduleUpdateFn: IFunction,
     heroPutFn: IFunction,
-    heroMemberDeleteFn: IFunction
+    heroMemberDeleteFn: IFunction,
+    heroDeleteFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
@@ -239,6 +248,14 @@ export class HeroOfTheDayStack extends Stack {
           authorizer,
           authorizationType: apigw.AuthorizationType.CUSTOM
         }
+    )
+
+    heroHeroPathResource.addMethod('DELETE',
+      new apigw.LambdaIntegration(heroDeleteFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
     )
 
     heroHeroPathResource.addResource('members').addResource('{member}').addMethod('DELETE',

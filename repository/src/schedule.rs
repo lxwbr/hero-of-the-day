@@ -3,6 +3,7 @@ use aws_config::SdkConfig;
 use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use model::schedule::Schedule;
 use std::env;
+use futures::future;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -167,6 +168,20 @@ impl ScheduleRepository {
             .item("assignees", AttributeValue::Ss(schedule.assignees.clone()))
             .send()
             .await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, hero_name: String) -> Result<(), Error> {
+        let schedules = self.get(hero_name, None).await?;
+
+        let _ = future::try_join_all(schedules.iter().map(|schedule|
+            self.client
+            .delete_item()
+            .table_name(&self.table_name)
+            .key("hero", AttributeValue::S(schedule.hero.to_string()))
+            .key("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
+            .send()
+        )).await?;
         Ok(())
     }
 }
