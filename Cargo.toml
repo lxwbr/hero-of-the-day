@@ -11,6 +11,7 @@ members = [
     "hero-list",
     "hero-put",
     "hero-get",
+    "hero-delete-member",
     "user-create",
     "model"
 ]

@@ -67,7 +67,7 @@ async fn main() -> Result<(), Error> {
 
                             // If it is an ADD operation, update the hero table to include the e-mail address to the members list.
                             if let Operation::Add = operation {
-                                hero_repository_ref.append_members(hero.to_string(), payload.assignees).await?;
+                                hero_repository_ref.update_members(hero.to_string(), payload.assignees, repository::hero::UpdateOperation::Add).await?;
                             }
 
                             if duration == 0 {

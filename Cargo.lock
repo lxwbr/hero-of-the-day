@@ -1092,6 +1092,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hero-delete-member"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb 0.19.0",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.21.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "hero-get"
 version = "0.1.0"
 dependencies = [

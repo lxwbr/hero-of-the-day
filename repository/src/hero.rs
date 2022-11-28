@@ -3,11 +3,18 @@ use model::hero::Hero;
 use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use std::env;
 
+use crate::schedule::Operation;
+
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub struct HeroRepository {
     client: Client,
     table_name: String
+}
+
+pub enum UpdateOperation {
+    Add,
+    Delete,
 }
 
 impl HeroRepository {
@@ -62,18 +69,24 @@ impl HeroRepository {
         Ok(())
     }
 
-    pub async fn append_members(
+    pub async fn update_members(
         &self,
         hero: String,
         members: Vec<String>,
+        operation: UpdateOperation
     ) -> Result<Vec<String>, Error> {
+        let update_expression = match operation {
+            UpdateOperation::Add => "ADD members :m",
+            UpdateOperation::Delete => "DELETE members :m"
+        };
+
         let attributes = self
             .client
             .update_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(hero.clone()))
             .expression_attribute_values(":m", AttributeValue::Ss(members))
-            .update_expression("ADD members :m")
+            .update_expression(update_expression)
             .return_values(ReturnValue::UpdatedNew)
             .send()
             .await?

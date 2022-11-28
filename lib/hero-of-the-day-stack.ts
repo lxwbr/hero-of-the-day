@@ -41,12 +41,13 @@ export class HeroOfTheDayStack extends Stack {
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable, heroTable, slackParameter);
     let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable, heroTable, slackParameter);
+    let heroMemberDeleteFn: IFunction = this.heroMemeberDelete(heroTable);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -175,6 +176,12 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
+  heroMemeberDelete(heroTable: ITable): IFunction {
+    let fn = this.createFn('HeroMemberDelete', 'hero-delete-member');
+    heroTable.grantReadWriteData(fn);
+    return fn;
+  }
+
   apiGateway(
     authorizerFn: IFunction,
     heroListFn: IFunction,
@@ -182,7 +189,8 @@ export class HeroOfTheDayStack extends Stack {
     userCreateFn: IFunction,
     scheduleGetFn: IFunction,
     scheduleUpdateFn: IFunction,
-    heroPutFn: IFunction
+    heroPutFn: IFunction,
+    heroMemberDeleteFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
@@ -231,6 +239,14 @@ export class HeroOfTheDayStack extends Stack {
           authorizer,
           authorizationType: apigw.AuthorizationType.CUSTOM
         }
+    )
+
+    heroHeroPathResource.addResource('members').addResource('{member}').addMethod('DELETE',
+      new apigw.LambdaIntegration(heroMemberDeleteFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
     )
 
     userPath.addResource('{user}').addMethod('PUT',
