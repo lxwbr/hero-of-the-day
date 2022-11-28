@@ -114,15 +114,19 @@ async fn check_user(
         if resource == "user" {
             apply_policy(Effect::Allow)
         } else {
-            let hero = hero_repository_ref.get(sub_resource.to_string()).await?;
             let email = info.email;
-            info!("email: {} in {:?}", email, hero.members);
-            if hero.members.contains(&email) {
-                info!("ALLOW");
+            if http_verb == "PUT" {
                 apply_policy(Effect::Allow)
             } else {
-                info!("DENY");
-                apply_policy(Effect::Deny)
+                let hero = hero_repository_ref.get(sub_resource.to_string()).await?;
+                info!("email: {} in {:?}", email, hero.members);
+                if hero.members.contains(&email) {
+                    info!("ALLOW");
+                    apply_policy(Effect::Allow)
+                } else {
+                    info!("DENY");
+                    apply_policy(Effect::Deny)
+                }
             }
         }
     } else {

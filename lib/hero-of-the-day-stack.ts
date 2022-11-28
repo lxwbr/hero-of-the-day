@@ -36,6 +36,7 @@ export class HeroOfTheDayStack extends Stack {
     let authorizer: IFunction = this.authorizer(heroTable, userTable);
     let heroListFn: IFunction = this.heroList(heroTable);
     let heroGetFn: IFunction = this.heroGet(heroTable);
+    let heroPutFn: IFunction = this.heroPut(heroTable);
     let userCreateFn: IFunction = this.userCreate(userTable);
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable, heroTable, slackParameter);
@@ -45,7 +46,7 @@ export class HeroOfTheDayStack extends Stack {
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -140,6 +141,12 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
+  heroPut(table: ITable): IFunction {
+    let fn = this.createFn('HeroCreateFunction', 'hero-put');
+    table.grantReadWriteData(fn);
+    return fn;
+  }
+
   userCreate(table: ITable): IFunction {
     let fn = this.createFn('UserCreateFunction', 'user-create');
     table.grantReadWriteData(fn);
@@ -174,7 +181,8 @@ export class HeroOfTheDayStack extends Stack {
     heroGetFn: IFunction,
     userCreateFn: IFunction,
     scheduleGetFn: IFunction,
-    scheduleUpdateFn: IFunction
+    scheduleUpdateFn: IFunction,
+    heroPutFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
@@ -184,7 +192,7 @@ export class HeroOfTheDayStack extends Stack {
           'Content-Type','X-Amz-Date','Authorization','X-Api-Key','X-Amz-Security-Token','X-Amz-User-Agent'
         ],
         allowOrigins: apigw.Cors.ALL_ORIGINS,
-        allowMethods: apigw.Cors.ALL_METHODS,
+        allowMethods: ["POST", "PUT", "GET", "DELETE", "OPTIONS"],
       }
     });
 
@@ -208,12 +216,21 @@ export class HeroOfTheDayStack extends Stack {
       }
     );
 
-    heroPath.addResource('{hero}').addMethod('GET',
+    let heroHeroPathResource = heroPath.addResource('{hero}');
+    heroHeroPathResource.addMethod('GET',
       new apigw.LambdaIntegration(heroGetFn, { proxy: true }), 
-      {
-        authorizer,
-        authorizationType: apigw.AuthorizationType.CUSTOM
-      }
+        {
+          authorizer,
+          authorizationType: apigw.AuthorizationType.CUSTOM
+        }
+    )
+
+    heroHeroPathResource.addMethod('PUT',
+      new apigw.LambdaIntegration(heroPutFn, { proxy: true }), 
+        {
+          authorizer,
+          authorizationType: apigw.AuthorizationType.CUSTOM
+        }
     )
 
     userPath.addResource('{user}').addMethod('PUT',

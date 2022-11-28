@@ -9,6 +9,7 @@ members = [
     "slack",
     "slack-usergroup-users-update",
     "hero-list",
+    "hero-put",
     "hero-get",
     "user-create",
     "model"

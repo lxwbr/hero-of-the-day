@@ -1126,6 +1126,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hero-put"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb 0.19.0",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.21.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
