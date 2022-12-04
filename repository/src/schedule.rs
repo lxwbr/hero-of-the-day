@@ -44,34 +44,32 @@ impl ScheduleRepository {
         }
     }
 
-    pub async fn get(&self, hero: String, shift_start_time: Option<i64>) -> Result<Vec<Schedule>, Error> {
+    pub async fn get(&self, hero: String, between: Option<(i64, i64)>) -> Result<Vec<Schedule>, Error> {
         let mut attribute_values = hashmap! {
             ":hero".to_string() => AttributeValue::S(hero)
         };
 
         let mut key_condition_expression = "hero = :hero".to_string();
 
-        if let Some(time) = shift_start_time {
-            attribute_values.insert(
-                ":shift_start_time".to_string(), AttributeValue::N(time.to_string())
-            );
-            key_condition_expression = format!("{} AND shift_start_time = :shift_start_time", key_condition_expression);
+        if let Some((start_time, end_time)) = between {
+            attribute_values.insert(":s".to_string(), AttributeValue::N(start_time.to_string()));
+            attribute_values.insert(":e".to_string(), AttributeValue::N(end_time.to_string()));
+            key_condition_expression = format!("{} shift_start_time BETWEEN :s AND :e", key_condition_expression);
         }
 
-        let response = self.client
+        let schedules = self.client
             .query()
             .key_condition_expression(key_condition_expression)
             .set_expression_attribute_values(Some(attribute_values))
             .table_name(&self.table_name)
             .send()
-            .await?;
-
-        let schedules: Vec<Schedule> = response
+            .await?
             .items()
             .unwrap_or_default()
             .into_iter()
             .map(Schedule::from_dynamo_item)
             .collect();
+
         Ok(schedules)
     }
 

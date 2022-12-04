@@ -1,4 +1,4 @@
-use futures::{prelude::*, stream::futures_unordered::FuturesUnordered};
+use futures::{prelude::*};
 use model::schedule::Schedule;
 use reqwest;
 use aws_sdk_ssm::{Client as SsmClient};
@@ -68,7 +68,7 @@ impl Client {
     }
 
     /// Lists all Slack groups in order to have an id to handle relation.
-    pub async fn usergroups_list(self) -> Result<Vec<Usergroup>, Error> {
+    pub async fn usergroups_list(&self) -> Result<Vec<Usergroup>, Error> {
         let result: UsergroupsListResponse = self
             .client
             .get(
@@ -90,7 +90,7 @@ impl Client {
     }
 
     /// Resolves Slack user id by using user's e-mail address.
-    pub async fn lookup_by_email(self, email: String) -> Result<User, Error> {
+    pub async fn lookup_by_email(&self, email: String) -> Result<User, Error> {
         let result: UsersLookupByEmailResponse = self
             .client
             .get(
@@ -112,9 +112,9 @@ impl Client {
     }
 
     pub async fn usergroups_users_update(
-        self,
-        usergroup_id: String,
-        user_ids: Vec<String>,
+        &self,
+        usergroup_id: &String,
+        user_ids: &Vec<String>,
     ) -> Result<(), Error> {
         let url =
             format!(
@@ -131,47 +131,38 @@ impl Client {
         }
     }
 
+    async fn look_up_user_ids_by_email(&self, schedule: &Schedule) -> Result<Vec<String>, Error> {
+        let result = future::try_join_all(schedule.assignees.iter().map(|assignee|
+            self.lookup_by_email(assignee.clone()).map_ok(|user| user.id)
+        )).await;
+        result
+    }
+
     pub async fn usergroups_users_update_with_schedules(
-        self,
+        &self,
         schedules: Vec<Schedule>,
     ) -> Result<(), Error> {
-        let token = self.token.clone();
+        let usergroup_id_map: HashMap<String, String> = self.usergroups_list().map_ok(|usergroups| usergroups.into_iter().map(|a| (a.handle, a.id)).collect()).await?;
 
-        let mut usergroup_id_map = HashMap::new();
-        for usergroup in self.usergroups_list().await? {
-            usergroup_id_map.insert(usergroup.handle, usergroup.id);
-        }
-
-        for schedule in schedules {
-            match usergroup_id_map.get(&schedule.hero) {
-                Some(usergroup_id) => {
-                    let mut user_ids = Vec::new();
-                    let mut user_id_results = schedule
-                        .assignees
-                        .iter()
-                        .map(|assignee| {
-                            Client::new(token.clone()).lookup_by_email(assignee.clone())
-                        })
-                        .collect::<FuturesUnordered<_>>();
-
-                    while let Some(user_result) = user_id_results.next().await {
-                        match user_result {
-                            Ok(user) => user_ids.push(user.id),
-                            Err(e) => println!("Got error back: {}", e),
-                        }
+        let updates: Vec<(&String, Vec<String>)> = future::try_join_all(schedules.iter().map(|schedule| {
+            self.look_up_user_ids_by_email(schedule).map_ok(|users| {
+                match usergroup_id_map.get(&schedule.hero) {
+                    Some(usergroup_id) => {
+                        Some((usergroup_id, users))
                     }
-
-                    Client::new(token.clone())
-                        .usergroups_users_update(usergroup_id.clone(), user_ids.clone())
-                        .await?;
-
-                    println!("{}: {:?}", usergroup_id, user_ids);
+                    None => {
+                        println!("no usergroup id for {}", schedule.hero);
+                        None
+                    }
                 }
-                None => {
-                    println!("no usergroup id");
-                }
-            }
-        }
+            })
+        })).await?.into_iter().flatten().collect();
+
+        future::try_join_all(updates.iter().map(|(usergroup_id, user_ids)| {
+            println!("Updating usergroup_id {}: user_ids: {:?}", usergroup_id, user_ids);
+            self.usergroups_users_update(usergroup_id, user_ids)
+        })).await?;
+
         Ok(())
     }
 }
