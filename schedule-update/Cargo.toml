@@ -19,4 +19,4 @@ repository = { path = "../repository" }
 response = { path = "../response" }
 slack = { path = "../slack" }
 chrono = "0"
-chrono-tz = "0.8.0"
+chrono-tz = "0.8.1"
