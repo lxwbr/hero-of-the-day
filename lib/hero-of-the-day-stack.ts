@@ -17,9 +17,9 @@ const environment = {
   "OLD_HERO_TABLE": 'hero-of-the-day-dev-hero',
   "OLD_SCHEDULE_TABLE": 'hero-of-the-day-dev-schedule',
   "OLD_USER_TABLE": 'hero-of-the-day-dev-user',
-  "HOSTED_DOMAIN": 'moia.io',
-  "GOOGLE_CLIENT_ID": '356839337273-s4slmoo3nc0odhjsocbqs0fjra3lvn3v.apps.googleusercontent.com',
-  "MS_CLIENT_ID": 'aec83053-579c-4646-812e-cfa7d97ad9a0',
+  "HOSTED_DOMAIN": 'xxx',
+  "GOOGLE_CLIENT_ID": 'xxx',
+  "MS_CLIENT_ID": 'xxx',
   "SLACK_TOKEN_PARAMETER": `/${heroOfTheDay}/slack-token`
 }
 
