@@ -1,18 +1,14 @@
 use maplit::hashmap;
+use aws_config::SdkConfig;
+use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use model::schedule::Schedule;
-use rusoto_dynamodb::{
-    AttributeValue, DeleteItemInput, DynamoDb, DynamoDbClient, QueryInput, UpdateItemInput,
-};
 use std::env;
-
-#[path = "error.rs"]
-mod error;
-use error::RepositoryError;
+use futures::future;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub struct ScheduleRepository<'a> {
-    client: &'a DynamoDbClient,
+pub struct ScheduleRepository {
+    client: Client,
     table_name: String,
 }
 
@@ -33,47 +29,43 @@ impl std::str::FromStr for Operation {
     }
 }
 
-impl ScheduleRepository<'_> {
-    pub fn new(client: &DynamoDbClient) -> ScheduleRepository {
+impl ScheduleRepository {
+    pub fn new(shared_config: &SdkConfig) -> ScheduleRepository {
         ScheduleRepository {
-            client,
+            client: Client::new(&shared_config),
             table_name: env::var("SCHEDULE_TABLE").unwrap(),
         }
     }
 
-    pub async fn get(self, hero: String, shift_start_time: Option<i64>) -> Result<Vec<Schedule>, Error> {
+    pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> ScheduleRepository {
+        ScheduleRepository {
+            client: Client::new(&shared_config),
+            table_name: env::var(table_name).unwrap()
+        }
+    }
+
+    pub async fn get(&self, hero: String, between: Option<(i64, i64)>) -> Result<Vec<Schedule>, Error> {
         let mut attribute_values = hashmap! {
-            ":hero".to_owned() => AttributeValue {
-                s: Some(hero),
-                ..Default::default()
-            }
+            ":hero".to_string() => AttributeValue::S(hero)
         };
 
         let mut key_condition_expression = "hero = :hero".to_string();
 
-        if let Some(time) = shift_start_time {
-            attribute_values.insert(
-                ":shift_start_time".to_owned(), AttributeValue {
-                    n: Some(time.to_string()),
-                    ..Default::default()
-                }
-            );
-            key_condition_expression = format!("{} AND shift_start_time = :shift_start_time", key_condition_expression);
+        if let Some((start_time, end_time)) = between {
+            attribute_values.insert(":s".to_string(), AttributeValue::N(start_time.to_string()));
+            attribute_values.insert(":e".to_string(), AttributeValue::N(end_time.to_string()));
+            key_condition_expression = format!("{} shift_start_time BETWEEN :s AND :e", key_condition_expression);
         }
 
-        let query_input = QueryInput {
-            table_name: self.table_name,
-            key_condition_expression: Some(key_condition_expression),
-            expression_attribute_values: Some(attribute_values),
-            ..Default::default()
-        };
-
-        let schedules: Vec<Schedule> = self
-            .client
-            .query(query_input)
+        let schedules = self.client
+            .query()
+            .key_condition_expression(key_condition_expression)
+            .set_expression_attribute_values(Some(attribute_values))
+            .table_name(&self.table_name)
+            .send()
             .await?
-            .items
-            .ok_or(RepositoryError::NoneScan)?
+            .items()
+            .unwrap_or_default()
             .into_iter()
             .map(Schedule::from_dynamo_item)
             .collect();
@@ -82,56 +74,40 @@ impl ScheduleRepository<'_> {
     }
 
     pub async fn update_assignees(
-        self,
+        &self,
         operation: &Operation,
-        hero: String,
+        hero: &String,
         shift_start_time: i64,
         assignees: Vec<String>,
     ) -> Result<Option<Schedule>, Error> {
-        let key = hashmap! {
-            "hero".to_string() => AttributeValue {
-                s: Some(hero),
-                ..Default::default()
-            },
-            "shift_start_time".to_owned() => AttributeValue {
-                n: Some(shift_start_time.to_string()),
-                ..Default::default()
-            }
-        };
-
-        let expression_attribute_values = hashmap! {
-            ":a".to_string() => AttributeValue {
-                ss: Some(assignees),
-                ..Default::default()
-            }
-        };
-
         let update_expression = match operation {
             Operation::Add => "ADD assignees :a".to_string(),
             Operation::Delete => "DELETE assignees :a".to_string(),
         };
 
-        let update_item_input = UpdateItemInput {
-            table_name: self.table_name.clone(),
-            key: key.clone(),
-            update_expression: Some(update_expression),
-            expression_attribute_values: Some(expression_attribute_values),
-            return_values: Some("ALL_NEW".to_string()),
-            ..Default::default()
-        };
+        let update_item_output = self.client
+            .update_item()
+            .table_name(&self.table_name)
+            .key("hero", AttributeValue::S(hero.clone()))
+            .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+            .update_expression(update_expression)
+            .expression_attribute_values(":a", AttributeValue::Ss(assignees))
+            .return_values(ReturnValue::AllNew)
+            .send()
+            .await?;
 
-        let attributes = self.client.update_item(update_item_input).await?.attributes;
         let schedule = Schedule::from_dynamo_item(
-            attributes.expect("Expected attributes from the UpdateItemInput."),
+            update_item_output.attributes().expect("Expected attributes from the UpdateItemInput."),
         );
 
         if schedule.assignees.is_empty() {
-            let delete_item_input = DeleteItemInput {
-                table_name: self.table_name,
-                key,
-                ..Default::default()
-            };
-            self.client.delete_item(delete_item_input).await?;
+            self.client
+                .delete_item()
+                .table_name(&self.table_name)
+                .key("hero", AttributeValue::S(hero.clone()))
+                .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+                .send()
+                .await?;
             Ok(None)
         } else {
             Ok(Some(schedule))
@@ -139,43 +115,94 @@ impl ScheduleRepository<'_> {
     }
 
     pub async fn get_first_before(
-        self,
+        &self,
         hero: String,
         timestamp: u64,
     ) -> Result<Option<Schedule>, Error> {
-        let expression_attribute_values = hashmap! {
-            ":s".to_string() => AttributeValue {
-                n: Some(timestamp.to_string()),
-                ..Default::default()
-            },
-            ":h".to_string() => AttributeValue {
-                s: Some(hero),
-                ..Default::default()
-            }
-        };
-
-        let query_input = QueryInput {
-            table_name: self.table_name,
-            key_condition_expression: Some("hero = :h AND shift_start_time <= :s".to_string()),
-            expression_attribute_values: Some(expression_attribute_values),
-            scan_index_forward: Some(false),
-            limit: Some(1),
-            ..Default::default()
-        };
-
         let schedules: Vec<Schedule> = self
             .client
-            .query(query_input)
+            .query()
+            .table_name(&self.table_name)
+            .key_condition_expression("hero = :h AND shift_start_time <= :s")
+            .expression_attribute_values(":s", AttributeValue::N(timestamp.to_string()))
+            .expression_attribute_values(":h", AttributeValue::S(hero))
+            .scan_index_forward(false)
+            .limit(1)
+            .send()
             .await?
             .items
             .unwrap()
             .into_iter()
-            .map(Schedule::from_dynamo_item)
+            .map(|item| Schedule::from_dynamo_item(&item))
             .collect();
         if schedules.is_empty() {
             Ok(None)
         } else {
             Ok(Some(schedules.into_iter().nth(0).unwrap()))
         }
+    }
+
+    pub async fn get_all_repeating_before(
+        &self,
+        hero: String,
+        timestamp: u64
+    ) -> Result<Vec<Schedule>, Error> {
+        let schedules: Vec<Schedule> = self
+            .client
+            .query()
+            .table_name(&self.table_name)
+            .key_condition_expression("hero = :h AND shift_start_time <= :s")
+            .expression_attribute_values(":s", AttributeValue::N(timestamp.to_string()))
+            .expression_attribute_values(":h", AttributeValue::S(hero))
+            .filter_expression("attribute_exists(repeat_every_days)")
+            .send()
+            .await?
+            .items
+            .unwrap()
+            .into_iter()
+            .map(|item| Schedule::from_dynamo_item(&item))
+            .collect();
+        Ok(schedules)
+    }
+
+    pub async fn list(&self) -> Result<Vec<Schedule>, Error> {
+        let response = self.client
+            .scan()
+            .table_name(&self.table_name)
+            .send()
+            .await?;
+        let heroes: Vec<Schedule> = response
+            .items()
+            .unwrap_or_default()
+            .into_iter()
+            .map(Schedule::from_dynamo_item)
+            .collect();
+        Ok(heroes)
+    }
+
+    pub async fn put(&self, schedule: &Schedule) -> Result<(), Error> {
+        self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .item("hero", AttributeValue::S(schedule.hero.to_string()))
+            .item("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
+            .item("assignees", AttributeValue::Ss(schedule.assignees.clone()))
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, hero_name: String) -> Result<(), Error> {
+        let schedules = self.get(hero_name, None).await?;
+
+        let _ = future::try_join_all(schedules.iter().map(|schedule|
+            self.client
+            .delete_item()
+            .table_name(&self.table_name)
+            .key("hero", AttributeValue::S(schedule.hero.to_string()))
+            .key("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
+            .send()
+        )).await?;
+        Ok(())
     }
 }

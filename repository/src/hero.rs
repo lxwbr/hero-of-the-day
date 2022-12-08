@@ -1,102 +1,92 @@
-use maplit::hashmap;
+use aws_config::SdkConfig;
 use model::hero::Hero;
-use rusoto_dynamodb::{
-    AttributeValue, DynamoDb, DynamoDbClient, GetItemInput, ScanInput, UpdateItemInput,
-};
+use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub struct HeroRepository<'a> {
-    client: &'a DynamoDbClient,
-    table_name: String,
+pub struct HeroRepository {
+    client: Client,
+    table_name: String
 }
 
-impl HeroRepository<'_> {
-    pub fn new(client: &DynamoDbClient) -> HeroRepository {
+pub enum UpdateOperation {
+    Add,
+    Delete,
+}
+
+impl HeroRepository {
+    pub fn new(shared_config: &SdkConfig) -> HeroRepository {
         HeroRepository {
-            client,
-            table_name: env::var("HERO_TABLE").unwrap(),
+            client: Client::new(&shared_config),
+            table_name: env::var("HERO_TABLE").unwrap()
         }
     }
 
-    pub async fn get(self, name: String) -> Result<Hero, Error> {
-        let attribute_values = hashmap! {
-            "name".to_owned() => AttributeValue {
-                s: Some(name),
-                ..Default::default()
-            }
-        };
+    pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> HeroRepository {
+        HeroRepository {
+            client: Client::new(&shared_config),
+            table_name: env::var(table_name).unwrap()
+        }
+    }
 
-        let get_item_input = GetItemInput {
-            table_name: self.table_name,
-            key: attribute_values,
-            ..Default::default()
-        };
-
-        let hero: Hero = Hero::from_dynamo_item(
-            self.client
-                .get_item(get_item_input)
-                .await?
-                .item
-                .expect("Expected to receive an item"),
-        );
-
+    pub async fn get(&self, name: String) -> Result<Hero, Error> {
+        let response = self.client
+            .get_item()
+            .key("name", AttributeValue::S(name))
+            .table_name(&self.table_name)
+            .send()
+            .await?;
+        let hero: Hero = Hero::from_dynamo_item(response.item().expect("hero not found"));
         Ok(hero)
     }
 
-    pub async fn list_names(self) -> Result<Vec<String>, Error> {
-        let scan_input = ScanInput {
-            table_name: self.table_name,
-            projection_expression: Some("#n".to_string()),
-            expression_attribute_names: Some(hashmap! {
-                "#n".to_string() => "name".to_string()
-            }),
-            ..Default::default()
-        };
-        let names: Vec<String> = self
-            .client
-            .scan(scan_input)
-            .await?
-            .items
-            .unwrap()
+    pub async fn list(&self) -> Result<Vec<Hero>, Error> {
+        let response = self.client
+            .scan()
+            .table_name(&self.table_name)
+            .send()
+            .await?;
+        let heroes: Vec<Hero> = response
+            .items()
+            .unwrap_or_default()
             .into_iter()
-            .map(|hm| hm["name"].s.as_ref().unwrap().to_string())
+            .map(Hero::from_dynamo_item)
             .collect();
-        Ok(names)
+        Ok(heroes)
     }
 
-    pub async fn append_members(
-        self,
+    pub async fn put(&self, hero: &Hero) -> Result<(), Error> {
+        self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .item("name", AttributeValue::S(hero.name.to_string()))
+            .item("members", AttributeValue::Ss(hero.members.to_owned()))
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_members(
+        &self,
         hero: String,
         members: Vec<String>,
+        operation: UpdateOperation
     ) -> Result<Vec<String>, Error> {
-        let key = hashmap! {
-            "name".to_string() => AttributeValue {
-                s: Some(hero.clone()),
-                ..Default::default()
-            }
-        };
-
-        let expression_attribute_values = hashmap! {
-            ":m".to_string() => AttributeValue {
-                ss: Some(members),
-                ..Default::default()
-            }
-        };
-
-        let update_item_input = UpdateItemInput {
-            table_name: self.table_name,
-            key,
-            update_expression: Some("ADD members :m".to_string()),
-            expression_attribute_values: Some(expression_attribute_values),
-            return_values: Some("UPDATED_NEW".to_string()),
-            ..Default::default()
+        let update_expression = match operation {
+            UpdateOperation::Add => "ADD members :m",
+            UpdateOperation::Delete => "DELETE members :m"
         };
 
         let attributes = self
             .client
-            .update_item(update_item_input)
+            .update_item()
+            .table_name(&self.table_name)
+            .key("name", AttributeValue::S(hero.clone()))
+            .expression_attribute_values(":m", AttributeValue::Ss(members))
+            .update_expression(update_expression)
+            .return_values(ReturnValue::UpdatedNew)
+            .send()
             .await?
             .attributes
             .expect("Expected attributes from the UpdateItemInput.");
@@ -104,12 +94,27 @@ impl HeroRepository<'_> {
         if attributes.is_empty() {
             Ok(Vec::new())
         } else {
-            let appended_members = attributes["members"].ss.as_ref().unwrap().to_vec();
+            let appended_members = attributes["members"].as_ss().unwrap().to_vec();
             println!(
                 "Following were added to the {} hero as members: {:?}",
                 hero, appended_members
             );
             Ok(appended_members)
         }
+    }
+
+    pub async fn delete(
+        &self,
+        hero: String,
+    ) -> Result<(), Error> {
+        self
+            .client
+            .delete_item()
+            .table_name(&self.table_name)
+            .key("name", AttributeValue::S(hero.clone()))
+            .send()
+            .await?;
+
+        Ok(())
     }
 }

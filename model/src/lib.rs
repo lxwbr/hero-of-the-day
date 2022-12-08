@@ -1,3 +1,3 @@
 pub mod hero;
-pub mod schedule;
 pub mod user;
+pub mod schedule;

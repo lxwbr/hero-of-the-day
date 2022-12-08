@@ -1,5 +1,6 @@
 use chrono::prelude::*;
-use rusoto_dynamodb::AttributeValue;
+
+use aws_sdk_dynamodb::model::AttributeValue;
 use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -10,28 +11,32 @@ pub struct Schedule {
     pub hero: String,
     pub shift_start_time: i64,
     pub assignees: Vec<String>,
+    pub repeat_every_days: Option<i32>
 }
 
 impl Schedule {
-    pub fn from_dynamo_item(item: HashMap<String, AttributeValue>) -> Schedule {
+    pub fn from_dynamo_item(item: &HashMap<String, AttributeValue>) -> Schedule {
         Schedule {
             hero: item["hero"]
-                .s
-                .as_ref()
+                .as_s()
                 .expect("hero attribute is missing in the League entry")
                 .to_owned(),
             shift_start_time: i64::from_str(
                 item["shift_start_time"]
-                    .n
-                    .as_ref()
+                    .as_n()
                     .expect("shift_start_time attribute is missing in the League entry"),
             )
             .expect("shift_start_time attribute was not an N field")
             .to_owned(),
             assignees: match item.get("assignees") {
-                Some(assignees) => assignees.ss.as_ref().unwrap_or(&Vec::new()).to_owned(),
+                Some(assignees) => assignees.as_ss().unwrap_or(&Vec::new()).to_owned(),
                 None => Vec::new(),
             },
+            repeat_every_days: item.get("repeat_every_days").map(|days|
+                i32::from_str(
+                    days.as_n().expect("repeat_every_days should be a number")
+                ).expect("repeat_every_days should be a number")
+            )
         }
     }
 }

@@ -1,50 +1,66 @@
-use maplit::hashmap;
+use aws_config::SdkConfig;
+use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use model::user::User;
-use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, PutItemInput};
 use std::env;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub struct UserRepository<'a> {
-    client: &'a DynamoDbClient,
+pub struct UserRepository {
+    client: Client,
     table_name: String,
 }
 
-impl UserRepository<'_> {
-    pub fn new(client: &DynamoDbClient) -> UserRepository {
+impl UserRepository {
+    pub fn new(shared_config: &SdkConfig) -> UserRepository {
         UserRepository {
-            client,
+            client: Client::new(&shared_config),
             table_name: env::var("USER_TABLE").unwrap(),
         }
     }
 
-    pub async fn put(self, user: &User) -> Result<&User, Error> {
-        let mut item = hashmap! {
-            "email".to_owned() => AttributeValue {
-                s: Some(user.email.clone()),
-                ..Default::default()
+    pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> UserRepository {
+        UserRepository {
+            client: Client::new(&shared_config),
+            table_name: env::var(table_name).unwrap()
+        }
+    }
+
+    pub async fn put(&self, user: &User) -> Result<(), Error> {
+        let put_item = self.client
+            .put_item()
+            .table_name(&self.table_name)
+            .item("email", AttributeValue::S(user.email.to_string()));
+
+        match user.last_login {
+            Some(last_login) => {
+                put_item
+                    .item("last_login", AttributeValue::N(last_login.to_string()))
+                    .return_values(ReturnValue::AllOld)
+                    .send()
+                    .await?;
+            }
+            None => {
+                put_item
+                    .return_values(ReturnValue::AllOld)
+                    .send()
+                    .await?;
             }
         };
+        Ok(())
+    }
 
-        if let Some(last_login) = user.last_login {
-            item.insert(
-                "last_login".to_string(),
-                AttributeValue {
-                    n: Some(last_login.to_string()),
-                    ..Default::default()
-                },
-            );
-        }
-
-        let put_item_input = PutItemInput {
-            table_name: self.table_name,
-            item,
-            return_values: Some("ALL_OLD".to_string()),
-            ..Default::default()
-        };
-
-        self.client.put_item(put_item_input).await?;
-
-        Ok(user)
+    pub async fn list(&self) -> Result<Vec<User>, Error> {
+        let response = self.client
+            .scan()
+            .table_name(&self.table_name)
+            .send()
+            .await?;
+        let heroes: Vec<User> = response
+            .items()
+            .unwrap_or_default()
+            .into_iter()
+            .map(User::from_dynamo_item)
+            .collect();
+        Ok(heroes)
     }
 }
