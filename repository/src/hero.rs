@@ -3,8 +3,6 @@ use model::hero::Hero;
 use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use std::env;
 
-use crate::schedule::Operation;
-
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub struct HeroRepository {

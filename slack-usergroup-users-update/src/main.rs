@@ -1,5 +1,6 @@
-use futures::{prelude::*, stream::futures_unordered::FuturesUnordered};
+use futures::{prelude::*};
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
+use model::schedule::Schedule;
 use repository::schedule::ScheduleRepository;
 use repository::hero::HeroRepository;
 use slack;
@@ -29,23 +30,17 @@ async fn main() -> Result<(), Error> {
 
         let hero_names = hero_repository_ref.list().await?;
 
-        let mut schedule_futures = hero_names
-            .iter()
-            .map(|hero| {
-                schedule_repository_ref.get_first_before(hero.name.clone(), secs)
-            })
-            .collect::<FuturesUnordered<_>>();
+        let repeating_schedules: Vec<Schedule> = future::try_join_all(hero_names.iter()
+        .map(|hero| {
+            schedule_repository_ref.get_all_repeating_before(hero.name.clone(), secs)
+        })).await?.into_iter().flatten().collect();
 
-        let mut schedules = Vec::new();
-        while let Some(schedule_result) = schedule_futures.next().await {
-            match schedule_result {
-                Ok(schedule_option) => match schedule_option {
-                    Some(schedule) => schedules.push(schedule),
-                    None => println!("no schedule"),
-                },
-                Err(e) => println!("{:?}", e),
-            }
-        }
+        println!("Repeating schedules: {:#?}", repeating_schedules);
+
+        let schedules: Vec<Schedule> = future::try_join_all(hero_names.iter()
+        .map(|hero| {
+            schedule_repository_ref.get_first_before(hero.name.clone(), secs)
+        })).await?.into_iter().flatten().collect();
 
         slack::Client::new(slack::get_slack_token().await?)
             .usergroups_users_update_with_schedules(schedules)

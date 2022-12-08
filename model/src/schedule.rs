@@ -11,6 +11,7 @@ pub struct Schedule {
     pub hero: String,
     pub shift_start_time: i64,
     pub assignees: Vec<String>,
+    pub repeat_every_days: Option<i32>
 }
 
 impl Schedule {
@@ -31,6 +32,11 @@ impl Schedule {
                 Some(assignees) => assignees.as_ss().unwrap_or(&Vec::new()).to_owned(),
                 None => Vec::new(),
             },
+            repeat_every_days: item.get("repeat_every_days").map(|days|
+                i32::from_str(
+                    days.as_n().expect("repeat_every_days should be a number")
+                ).expect("repeat_every_days should be a number")
+            )
         }
     }
 }

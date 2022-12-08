@@ -1,8 +1,6 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
 use repository::{hero::HeroRepository, schedule::ScheduleRepository};
-use model::hero::Hero;
 use response::{ok, bad_request};
-use serde::{Deserialize};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
