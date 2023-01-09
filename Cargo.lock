@@ -1171,6 +1171,7 @@ dependencies = [
  "response",
  "serde",
  "serde_json",
+ "slack",
  "tokio 1.21.2",
  "tracing",
  "tracing-subscriber",

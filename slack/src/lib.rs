@@ -26,6 +26,18 @@ impl fmt::Display for SlackUsergroupUsersUpdateError {
     }
 }
 
+impl std::error::Error for LookupError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+
+impl fmt::Display for LookupError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "JsonError: {}!", &self.details)
+    }
+}
+
 pub struct Client {
     client: reqwest::Client,
     token: String,
@@ -57,6 +69,11 @@ struct UsersLookupByEmailResponse {
 #[derive(Deserialize, Debug)]
 struct UsergroupsUsersUpdateResponse {
     ok: bool,
+}
+
+#[derive(Debug)]
+struct LookupError {
+    details: String
 }
 
 impl Client {
@@ -101,8 +118,10 @@ impl Client {
                 .as_str(),
             )
             .send()
+            .map_err(|err| Box::new(LookupError {details: format!("send(). email: {}, error: {}", email, err.to_string())}))
             .await?
             .json()
+            .map_err(|err| Box::new(LookupError {details: format!("json(). email: {}, error: {}", email, err.to_string())}))
             .await?;
         if result.ok {
             Ok(result.user)
@@ -120,6 +139,25 @@ impl Client {
             format!(
             "https://slack.com/api/usergroups.users.update?token={}&pretty=1&usergroup={}&users={}",
             self.token, usergroup_id, user_ids.join(",")
+        );
+        println!("url: {}", url);
+        let result: UsergroupsUsersUpdateResponse =
+            self.client.post(url.as_str()).send().await?.json().await?;
+        if result.ok {
+            Ok(())
+        } else {
+            Err(Box::new(SlackUsergroupUsersUpdateError::NotOk))
+        }
+    }
+
+    pub async fn create_usergroup(
+        &self,
+        usergroup_name: &String,
+    ) -> Result<(), Error> {
+        let url =
+            format!(
+            "https://slack.com/api/usergroups.create?token={}&pretty=1&name={}",
+            self.token, usergroup_name
         );
         println!("url: {}", url);
         let result: UsergroupsUsersUpdateResponse =

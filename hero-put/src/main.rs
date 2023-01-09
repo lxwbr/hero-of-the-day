@@ -26,6 +26,7 @@ async fn main() -> Result<(), Error> {
                             members: payload.members
                         };
                         let hero = repository_ref.put(&hero).await?;
+                        // slack::Client::new(slack::get_slack_token().await?).create_usergroup(&name.to_string());
                         ok(hero)
                     }
                     None => bad_request("Could not parse JSON payload for schedule update".into())
