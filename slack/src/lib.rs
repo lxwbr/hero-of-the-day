@@ -172,7 +172,10 @@ impl Client {
     async fn look_up_user_ids_by_email(&self, schedule: &Schedule) -> Result<Vec<String>, Error> {
         let result = future::try_join_all(schedule.assignees.iter().map(|assignee|
             self.lookup_by_email(assignee.clone()).map_ok(|user| user.id)
-        )).await;
+        )).await.map_err(|err| {
+            println!("{}", err.to_string());
+            err
+        });
         result
     }
 
@@ -182,7 +185,7 @@ impl Client {
     ) -> Result<(), Error> {
         let usergroup_id_map: HashMap<String, String> = self.usergroups_list().map_ok(|usergroups| usergroups.into_iter().map(|a| (a.handle, a.id)).collect()).await?;
 
-        let updates: Vec<(&String, Vec<String>)> = future::try_join_all(schedules.iter().map(|schedule| {
+        let updates: Vec<Option<(&String, Vec<String>)>> = future::join_all(schedules.iter().map(|schedule| {
             self.look_up_user_ids_by_email(schedule).map_ok(|users| {
                 match usergroup_id_map.get(&schedule.hero) {
                     Some(usergroup_id) => {
@@ -194,12 +197,14 @@ impl Client {
                     }
                 }
             })
-        })).await?.into_iter().flatten().collect();
+        })).await.into_iter().flatten().collect();
 
-        future::try_join_all(updates.iter().map(|(usergroup_id, user_ids)| {
+        let filtered: Vec<(&String, Vec<String>)> = updates.into_iter().flatten().collect();
+
+        future::join_all(filtered.iter().map(|(usergroup_id, user_ids)| {
             println!("Updating usergroup_id {}: user_ids: {:?}", usergroup_id, user_ids);
-            self.usergroups_users_update(usergroup_id, user_ids)
-        })).await?;
+            self.usergroups_users_update(usergroup_id, user_ids.as_ref())
+        })).await;
 
         Ok(())
     }
