@@ -1,8 +1,8 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use repository::hero::HeroRepository;
 use model::hero::Hero;
-use response::{ok, bad_request};
-use serde::{Deserialize};
+use repository::hero::HeroRepository;
+use response::{bad_request, ok};
+use serde::Deserialize;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -23,22 +23,23 @@ async fn main() -> Result<(), Error> {
                     Some(payload) => {
                         let hero = Hero {
                             name: name.to_string(),
-                            members: payload.members
+                            members: payload.members,
                         };
                         let hero = repository_ref.put(&hero).await?;
                         // slack::Client::new(slack::get_slack_token().await?).create_usergroup(&name.to_string());
                         ok(hero)
                     }
-                    None => bad_request("Could not parse JSON payload for schedule update".into())
+                    None => bad_request("Could not parse JSON payload for schedule update".into()),
                 }
-            },
-            _ => bad_request("Expected hero".into())
+            }
+            _ => bad_request("Expected hero".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }
 
 #[derive(Deserialize, Debug, Clone)]
 struct Payload {
-    members: Vec<String>
+    members: Vec<String>,
 }

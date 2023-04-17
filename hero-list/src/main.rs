@@ -15,11 +15,12 @@ async fn main() -> Result<(), Error> {
 
     let shared_config = aws_config::load_from_env().await;
     let repository_ref = &HeroRepository::new(&shared_config);
-    
+
     run(service_fn(move |_: Request| async move {
         let heroes: Vec<Hero> = repository_ref.list().await?;
         info!("Fetched {} heroes.", heroes.len());
         ok(heroes)
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }

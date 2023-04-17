@@ -1,6 +1,6 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
 use repository::{hero::HeroRepository, schedule::ScheduleRepository};
-use response::{ok, bad_request};
+use response::{bad_request, ok};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -21,9 +21,10 @@ async fn main() -> Result<(), Error> {
                 schedule_repository_ref.delete(name.to_string()).await?;
                 hero_repository_ref.delete(name.to_string()).await?;
                 ok(())
-            },
-            _ => bad_request("Expected hero".into())
+            }
+            _ => bad_request("Expected hero".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }

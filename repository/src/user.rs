@@ -1,5 +1,8 @@
 use aws_config::SdkConfig;
-use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
+use aws_sdk_dynamodb::{
+    model::{AttributeValue, ReturnValue},
+    Client,
+};
 use model::user::User;
 use std::env;
 
@@ -21,12 +24,13 @@ impl UserRepository {
     pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> UserRepository {
         UserRepository {
             client: Client::new(&shared_config),
-            table_name: env::var(table_name).unwrap()
+            table_name: env::var(table_name).unwrap(),
         }
     }
 
     pub async fn put(&self, user: &User) -> Result<(), Error> {
-        let put_item = self.client
+        let put_item = self
+            .client
             .put_item()
             .table_name(&self.table_name)
             .item("email", AttributeValue::S(user.email.to_string()));
@@ -40,17 +44,15 @@ impl UserRepository {
                     .await?;
             }
             None => {
-                put_item
-                    .return_values(ReturnValue::AllOld)
-                    .send()
-                    .await?;
+                put_item.return_values(ReturnValue::AllOld).send().await?;
             }
         };
         Ok(())
     }
 
     pub async fn list(&self) -> Result<Vec<User>, Error> {
-        let response = self.client
+        let response = self
+            .client
             .scan()
             .table_name(&self.table_name)
             .send()

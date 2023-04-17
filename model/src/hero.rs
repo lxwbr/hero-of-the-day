@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use aws_sdk_dynamodb::model::{AttributeValue};
+use aws_sdk_dynamodb::model::AttributeValue;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Hero {
@@ -15,10 +15,7 @@ impl Hero {
                 .as_s()
                 .expect("name attribute is missing in the League entry")
                 .to_owned(),
-            members: item["members"]
-                .as_ss()
-                .unwrap_or(&Vec::new())
-                .to_owned(),
+            members: item["members"].as_ss().unwrap_or(&Vec::new()).to_owned(),
         }
     }
 }

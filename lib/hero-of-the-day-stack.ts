@@ -13,6 +13,7 @@ const heroOfTheDay = 'hero-of-the-day'
 const environment = {
   "HERO_TABLE": `${heroOfTheDay}-hero`,
   "USER_TABLE": `${heroOfTheDay}-user`,
+  "PUNCH_CLOCK_TABLE": `${heroOfTheDay}-punch-clock`,
   "SCHEDULE_TABLE": `${heroOfTheDay}-schedule`,
   "OLD_HERO_TABLE": 'hero-of-the-day-dev-hero',
   "OLD_SCHEDULE_TABLE": 'hero-of-the-day-dev-schedule',
@@ -30,6 +31,7 @@ export class HeroOfTheDayStack extends Stack {
     let heroTable: ITable = this.heroTable();
     let userTable: ITable = this.userTable();
     let scheduleTable: ITable = this.scheduleTable();
+    let punchClockTable: ITable = this.punchClockTable();
 
     let slackParameter = StringParameter.fromStringParameterName(this, 'SlackParameter', environment.SLACK_TOKEN_PARAMETER);
 
@@ -40,15 +42,16 @@ export class HeroOfTheDayStack extends Stack {
     let userCreateFn: IFunction = this.userCreate(userTable);
     let scheduleGetFn: IFunction = this.scheduleGet(scheduleTable);
     let scheduleUpdateFn: IFunction = this.scheduleUpdate(scheduleTable, heroTable, slackParameter);
-    let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable, heroTable, slackParameter);
+    let slackUsergroupUsersUpdateFn: IFunction = this.slackUsergroupUsersUpdate(scheduleTable, heroTable, punchClockTable, slackParameter);
     let heroMemberDeleteFn: IFunction = this.heroMemeberDelete(heroTable);
     let heroDeleteFn: IFunction = this.heroDelete(heroTable, scheduleTable);
+    let punchClockRecalculateFn: IFunction = this.punchClockRecalculate(scheduleTable, punchClockTable, slackParameter);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn, punchClockRecalculateFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -77,6 +80,22 @@ export class HeroOfTheDayStack extends Stack {
       tableName: environment.USER_TABLE,
       partitionKey: {
         name: 'email',
+        type: AttributeType.STRING
+      },
+      billingMode: BillingMode.PAY_PER_REQUEST
+    });
+    return table;
+  }
+
+  punchClockTable(): ITable {
+    let table = new dynamodb.Table(this, environment.PUNCH_CLOCK_TABLE, {
+      tableName: environment.PUNCH_CLOCK_TABLE,
+      partitionKey: {
+        name: 'hero',
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: 'member',
         type: AttributeType.STRING
       },
       billingMode: BillingMode.PAY_PER_REQUEST
@@ -169,11 +188,20 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
-  slackUsergroupUsersUpdate(scheduleTable: ITable, heroTable: ITable, slackParameter: IParameter): IFunction {
+  slackUsergroupUsersUpdate(scheduleTable: ITable, heroTable: ITable, punchClockTable: ITable, slackParameter: IParameter): IFunction {
     let fn = this.createFn('SlackUsergroupUsersUpdateFunction', 'slack-usergroup-users-update', Duration.seconds(50));
     scheduleTable.grantReadData(fn);
     heroTable.grantReadData(fn);
     slackParameter.grantRead(fn);
+    punchClockTable.grantReadWriteData(fn);
+    return fn;
+  }
+
+  punchClockRecalculate(scheduleTable: ITable, punchClockTable: ITable, slackParameter: IParameter): IFunction {
+    let fn = this.createFn('PunchClockRecalculateFunction', 'punch-clock-recalculate');
+    scheduleTable.grantReadData(fn);
+    slackParameter.grantRead(fn);
+    punchClockTable.grantReadWriteData(fn);
     return fn;
   }
 
@@ -199,7 +227,8 @@ export class HeroOfTheDayStack extends Stack {
     scheduleUpdateFn: IFunction,
     heroPutFn: IFunction,
     heroMemberDeleteFn: IFunction,
-    heroDeleteFn: IFunction
+    heroDeleteFn: IFunction,
+    punchClockRecalculateFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
@@ -218,6 +247,8 @@ export class HeroOfTheDayStack extends Stack {
     let heroPath = api.root.addResource('hero');
     let userPath = api.root.addResource('user');
     let schedulePath = api.root.addResource('schedule');
+    let punchclockPath = api.root.addResource('punchclock');
+    let recalculatePath = punchclockPath.addResource('recalculate')
 
     let authorizer = new apigw.TokenAuthorizer(this, 'HeroOfTheDayCustomAuthorizer', {
       handler: authorizerFn,
@@ -284,6 +315,15 @@ export class HeroOfTheDayStack extends Stack {
     )
 
     heroResource.addMethod('POST', new apigw.LambdaIntegration(scheduleUpdateFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
+    const punchclockRecalculateResource = recalculatePath.addResource('{hero}');
+
+    punchclockRecalculateResource.addMethod('POST', new apigw.LambdaIntegration(punchClockRecalculateFn, { proxy: true }),
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM

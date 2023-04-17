@@ -1,6 +1,6 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
 use repository::hero::HeroRepository;
-use response::{ok, bad_request};
+use response::{bad_request, ok};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -16,17 +16,22 @@ async fn main() -> Result<(), Error> {
 
     run(service_fn(move |event: Request| async move {
         match event.path_parameters().first("hero") {
-            Some(name) => {
-                match event.path_parameters().first("member") {
-                    Some(member) => {
-                        let members = repository_ref.update_members(name.to_string(), vec![member.to_string()], repository::hero::UpdateOperation::Delete).await?;
-                        ok(members)
-                    }
-                    _ => bad_request("Expected member".into())
+            Some(name) => match event.path_parameters().first("member") {
+                Some(member) => {
+                    let members = repository_ref
+                        .update_members(
+                            name.to_string(),
+                            vec![member.to_string()],
+                            repository::hero::UpdateOperation::Delete,
+                        )
+                        .await?;
+                    ok(members)
                 }
+                _ => bad_request("Expected member".into()),
             },
-            _ => bad_request("Expected hero".into())
+            _ => bad_request("Expected hero".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }

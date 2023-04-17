@@ -1,6 +1,6 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
 use repository::hero::HeroRepository;
-use response::{ok, bad_request};
+use response::{bad_request, ok};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -19,9 +19,10 @@ async fn main() -> Result<(), Error> {
             Some(hero) => {
                 let hero = repository_ref.get(hero.into()).await?;
                 ok(hero)
-            },
-            _ => bad_request("Expected hero".into())
+            }
+            _ => bad_request("Expected hero".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }
