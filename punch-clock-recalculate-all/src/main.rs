@@ -1,9 +1,11 @@
-use lambda_http::{run, service_fn, Error, Request, RequestExt};
+use lambda_http::{run, service_fn, Error, Request};
+use model::hero::Hero;
 use model::punch_clock::recalculate_punch_time;
 use model::time::secs_now;
+use repository::hero::HeroRepository;
 use repository::punch_clock::PunchClockRepository;
 use repository::schedule::ScheduleRepository;
-use response::{bad_request, ok};
+use response::ok;
 use serde::Deserialize;
 
 #[tokio::main]
@@ -16,23 +18,23 @@ async fn main() -> Result<(), Error> {
         .init();
 
     let shared_config = aws_config::load_from_env().await;
+    let hero_repository_ref = &HeroRepository::new(&shared_config);
     let schedule_repository_ref = &ScheduleRepository::new(&shared_config);
     let punch_clock_repository_ref = &PunchClockRepository::new(&shared_config);
 
-    run(service_fn(move |event: Request| async move {
-        match event.path_parameters().first("hero") {
-            Some(hero) => {
-                let schedules = schedule_repository_ref
-                    .get(hero.to_string().clone(), Some((0, secs_now() as i64)))
-                    .await?;
-                let recalculated = recalculate_punch_time(hero.to_string().clone(), schedules);
-                for punch_clock in recalculated.into_iter() {
-                    punch_clock_repository_ref.put(&punch_clock).await?;
-                }
-                ok(())
+    run(service_fn(move |_event: Request| async move {
+        let heroes: Vec<Hero> = hero_repository_ref.list().await?;
+
+        for hero in heroes.into_iter() {
+            let schedules = schedule_repository_ref
+                .get(hero.name.to_string().clone(), Some((0, secs_now() as i64)))
+                .await?;
+            let recalculated = recalculate_punch_time(hero.name.to_string().clone(), schedules);
+            for punch_clock in recalculated.into_iter() {
+                punch_clock_repository_ref.put(&punch_clock).await?;
             }
-            None => bad_request("Could not parse JSON payload for schedule update".into()),
         }
+        ok(())
     }))
     .await?;
     Ok(())

@@ -1,10 +1,11 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use model::punch_clock::recalculate_punch_time;
+use model::punch_clock::PunchClock;
+use model::schedule::Schedule;
 use model::time::secs_now;
 use repository::punch_clock::PunchClockRepository;
 use repository::schedule::ScheduleRepository;
 use response::{bad_request, ok};
-use serde::Deserialize;
+use serde::Serialize;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -16,20 +17,29 @@ async fn main() -> Result<(), Error> {
         .init();
 
     let shared_config = aws_config::load_from_env().await;
-    let schedule_repository_ref = &ScheduleRepository::new(&shared_config);
     let punch_clock_repository_ref = &PunchClockRepository::new(&shared_config);
+    let schedule_repository_ref = &ScheduleRepository::new(&shared_config);
 
     run(service_fn(move |event: Request| async move {
         match event.path_parameters().first("hero") {
             Some(hero) => {
-                let schedules = schedule_repository_ref
-                    .get(hero.to_string().clone(), Some((0, secs_now() as i64)))
-                    .await?;
-                let recalculated = recalculate_punch_time(hero.to_string().clone(), schedules);
-                for punch_clock in recalculated.into_iter() {
-                    punch_clock_repository_ref.put(&punch_clock).await?;
+                let hero_string = hero.to_string();
+                let punch_cards: Vec<PunchClock> =
+                    punch_clock_repository_ref.get_all(hero_string).await?;
+
+                match schedule_repository_ref
+                    .get_first_before(hero.to_string(), secs_now())
+                    .await?
+                {
+                    None => ok(Response {
+                        punch_cards,
+                        current_schedule: None,
+                    }),
+                    Some(schedule) => ok(Response {
+                        punch_cards,
+                        current_schedule: Some(schedule),
+                    }),
                 }
-                ok(())
             }
             None => bad_request("Could not parse JSON payload for schedule update".into()),
         }
@@ -38,5 +48,8 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(Deserialize, Debug, Clone)]
-struct Payload {}
+#[derive(Serialize)]
+struct Response {
+    punch_cards: Vec<PunchClock>,
+    current_schedule: Option<Schedule>,
+}

@@ -1,5 +1,6 @@
 use aws_config::SdkConfig;
 use aws_sdk_dynamodb::{model::AttributeValue, Client};
+use maplit::hashmap;
 use model::punch_clock::PunchClock;
 use std::env;
 
@@ -28,7 +29,7 @@ impl PunchClockRepository {
         }
     }
 
-    pub async fn get(&self, hero: &String, member: &String) -> Result<Option<PunchClock>, Error> {
+    pub async fn get(&self, hero: &String, member: String) -> Result<Option<PunchClock>, Error> {
         let punch_clock = self
             .client
             .get_item()
@@ -41,6 +42,30 @@ impl PunchClockRepository {
             .map(PunchClock::from_dynamo_item);
 
         Ok(punch_clock)
+    }
+
+    pub async fn get_all(&self, hero: String) -> Result<Vec<PunchClock>, Error> {
+        let attribute_values = hashmap! {
+            ":hero".to_string() => AttributeValue::S(hero)
+        };
+
+        let key_condition_expression = "hero = :hero".to_string();
+
+        let punch_cards = self
+            .client
+            .query()
+            .key_condition_expression(key_condition_expression)
+            .set_expression_attribute_values(Some(attribute_values))
+            .table_name(&self.table_name)
+            .send()
+            .await?
+            .items()
+            .unwrap_or_default()
+            .into_iter()
+            .map(PunchClock::from_dynamo_item)
+            .collect();
+
+        Ok(punch_cards)
     }
 
     pub async fn put(&self, punch_clock: &PunchClock) -> Result<(), Error> {

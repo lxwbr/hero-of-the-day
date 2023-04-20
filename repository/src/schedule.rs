@@ -71,24 +71,44 @@ impl ScheduleRepository {
             attribute_values.insert(":s".to_string(), AttributeValue::N(start_time.to_string()));
             attribute_values.insert(":e".to_string(), AttributeValue::N(end_time.to_string()));
             key_condition_expression = format!(
-                "{} shift_start_time BETWEEN :s AND :e",
+                "{} AND shift_start_time BETWEEN :s AND :e",
                 key_condition_expression
             );
         }
 
-        let schedules = self
-            .client
-            .query()
-            .key_condition_expression(key_condition_expression)
-            .set_expression_attribute_values(Some(attribute_values))
-            .table_name(&self.table_name)
-            .send()
-            .await?
-            .items()
-            .unwrap_or_default()
-            .into_iter()
-            .map(Schedule::from_dynamo_item)
-            .collect();
+        let mut schedules = vec![];
+        let mut exclusive_start_key = None;
+
+        loop {
+            let request = self
+                .client
+                .query()
+                .key_condition_expression(key_condition_expression.clone())
+                .set_expression_attribute_values(Some(attribute_values.clone()))
+                .table_name(&self.table_name)
+                .set_exclusive_start_key(exclusive_start_key)
+                .send()
+                .await?;
+
+            if let Some(items) = request.items() {
+                schedules.extend(
+                    items
+                        .into_iter()
+                        .map(Schedule::from_dynamo_item)
+                        .collect::<Vec<Schedule>>(),
+                );
+                match request.last_evaluated_key {
+                    Some(last_evaluated_key) => {
+                        exclusive_start_key = Some(last_evaluated_key.clone());
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
 
         Ok(schedules)
     }

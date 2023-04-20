@@ -709,9 +709,9 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
-version = "0.8.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a87b30366b6766751277791b473b674f3bf7fb75696841c784a3eb7e7fbf44ee"
+checksum = "cf9cc2b23599e6d7479755f3594285efb3f74a1bdca7a7374948bc831e23a552"
 dependencies = [
  "chrono",
  "chrono-tz-build",
@@ -1648,6 +1648,7 @@ dependencies = [
  "aws-sdk-dynamodb 0.19.0",
  "bdays",
  "chrono",
+ "chrono-tz",
  "serde",
 ]
 
@@ -1909,6 +1910,46 @@ dependencies = [
 
 [[package]]
 name = "punch-clock-recalculate"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb 0.21.0",
+ "chrono",
+ "chrono-tz",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.21.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "punch-clock-recalculate-all"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb 0.21.0",
+ "chrono",
+ "chrono-tz",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.21.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "punch-clock-stats"
 version = "0.1.0"
 dependencies = [
  "aws-config",

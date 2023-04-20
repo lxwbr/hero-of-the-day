@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Schedule {
     pub hero: String,
     pub shift_start_time: i64,

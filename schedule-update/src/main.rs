@@ -73,9 +73,14 @@ async fn main() -> Result<(), Error> {
                             if duration == 0 {
                                 // Need to load the rest of the users for that day
                                 match schedule_repository_ref.get_first_before(hero.to_string(), shift_start_time.timestamp() as u64).await? {
-                                    Some(schedule) => slack::Client::new(slack::get_slack_token().await?)
-                                        .usergroups_users_update_with_schedules(vec!(schedule))
-                                        .await?,
+                                    Some(schedule) => {
+                                        let client = slack::Client::new(slack::get_slack_token().await?);
+                                        client.usergroups_users_update_with_schedules(vec!(schedule.clone())).await?;
+                                        let hero = hero_repository_ref.get(schedule.hero.clone()).await?;
+                                        if let Some(channel) = hero.channel {
+                                            client.post_message(&channel, &schedule.hero, schedule.assignees.clone()).await?
+                                        }
+                                    },
                                     None => ()
                                 }
                             }

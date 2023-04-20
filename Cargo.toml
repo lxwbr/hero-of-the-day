@@ -15,5 +15,7 @@ members = [
     "hero-delete-member",
     "user-create",
     "model",
-    "punch-clock-recalculate"
+    "punch-clock-recalculate",
+    "punch-clock-recalculate-all",
+    "punch-clock-stats"
 ]

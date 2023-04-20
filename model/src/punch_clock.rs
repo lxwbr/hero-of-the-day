@@ -1,9 +1,9 @@
+use crate::schedule::Schedule;
+use crate::time::days_diff;
 use aws_sdk_dynamodb::model::AttributeValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
-use crate::schedule::Schedule;
-use crate::time::days_diff;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PunchClock {
@@ -42,34 +42,48 @@ pub fn recalculate_punch_time(hero: String, schedules: Vec<Schedule>) -> Vec<Pun
     let mut punch_cards: HashMap<String, PunchClock> = HashMap::new();
 
     if !schedules.is_empty() {
-        let mut previous: i64 = schedules.first().unwrap().shift_start_time;
+        let mut previous: Schedule = schedules.first().unwrap().clone();
 
-        schedules.into_iter().for_each(|schedule| {
-            schedule.assignees.into_iter().for_each(|member| {
-                let days = days_diff(previous, schedule.shift_start_time) as u64;
-                if days > 0 {
-                    match punch_cards.get(member.as_str()) {
+        schedules.into_iter().skip(1).for_each(|schedule| {
+            let days = days_diff(previous.shift_start_time, schedule.shift_start_time) as u64;
+            if previous
+                .assignees
+                .contains(&"marcel.mindemann@moia.io".to_string())
+            {
+                println!("previous: {:?}, current: {:?}", previous, schedule);
+            }
+            if days > 0 {
+                previous.assignees.clone().into_iter().for_each(|assignee| {
+                    match punch_cards.get(assignee.as_str()) {
                         None => {
-                            punch_cards.insert(member.clone(), PunchClock {
+                            let punch_card = PunchClock {
                                 hero: hero.clone(),
-                                member: member.clone(),
+                                member: assignee.clone(),
                                 days,
-                                first_punch: previous,
-                                last_punch: previous
-                            });
+                                first_punch: previous.shift_start_time,
+                                last_punch: previous.shift_start_time,
+                            };
+                            if assignee == "marcel.mindemann@moia.io" {
+                                println!("{:?}", punch_card);
+                            }
+                            punch_cards.insert(assignee.clone(), punch_card);
                         }
                         Some(punched) => {
                             let old = punched.clone();
-                            punch_cards.insert(member, PunchClock {
+                            let punch_card = PunchClock {
                                 days: days + old.days.clone(),
-                                last_punch: previous,
+                                last_punch: previous.shift_start_time,
                                 ..old
-                            });
+                            };
+                            if assignee == "marcel.mindemann@moia.io" {
+                                println!("Some {:?}", punch_card);
+                            }
+                            punch_cards.insert(assignee.clone(), punch_card);
                         }
                     }
-                }
-            });
-            previous = schedule.shift_start_time;
+                });
+            }
+            previous = schedule.clone();
         });
     }
 

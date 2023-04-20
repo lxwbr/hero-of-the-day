@@ -46,12 +46,14 @@ export class HeroOfTheDayStack extends Stack {
     let heroMemberDeleteFn: IFunction = this.heroMemeberDelete(heroTable);
     let heroDeleteFn: IFunction = this.heroDelete(heroTable, scheduleTable);
     let punchClockRecalculateFn: IFunction = this.punchClockRecalculate(scheduleTable, punchClockTable, slackParameter);
+    let punchClockStatsFn: IFunction = this.punchClockStats(punchClockTable, scheduleTable, slackParameter);
+    let recalculatePunchClockFn: IFunction = this.recalculatePunchClock(heroTable, scheduleTable, punchClockTable);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
     this.migrate(heroTable, userTable, scheduleTable);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn, punchClockRecalculateFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn, punchClockRecalculateFn, punchClockStatsFn, recalculatePunchClockFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -205,6 +207,22 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
+  recalculatePunchClock(heroTable: ITable, scheduleTable: ITable, punchClockTable: ITable): IFunction {
+    let fn = this.createFn('RecalculatePunchClockFunction', 'punch-clock-recalculate-all');
+    heroTable.grantReadData(fn);
+    scheduleTable.grantReadData(fn);
+    punchClockTable.grantReadWriteData(fn);
+    return fn;
+  }
+
+  punchClockStats(punchClockTable: ITable, scheduleTable: ITable, slackParameter: IParameter): IFunction {
+    let fn = this.createFn('PunchClockStatsFunction', 'punch-clock-stats');
+    punchClockTable.grantReadData(fn);
+    scheduleTable.grantReadData(fn);
+    slackParameter.grantRead(fn);
+    return fn;
+  }
+
   heroMemeberDelete(heroTable: ITable): IFunction {
     let fn = this.createFn('HeroMemberDelete', 'hero-delete-member');
     heroTable.grantReadWriteData(fn);
@@ -228,7 +246,9 @@ export class HeroOfTheDayStack extends Stack {
     heroPutFn: IFunction,
     heroMemberDeleteFn: IFunction,
     heroDeleteFn: IFunction,
-    punchClockRecalculateFn: IFunction
+    punchClockRecalculateFn: IFunction,
+    punchClockStatsFn: IFunction,
+    recalculatePunchClockFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
       description: heroOfTheDay,
@@ -247,8 +267,7 @@ export class HeroOfTheDayStack extends Stack {
     let heroPath = api.root.addResource('hero');
     let userPath = api.root.addResource('user');
     let schedulePath = api.root.addResource('schedule');
-    let punchclockPath = api.root.addResource('punchclock');
-    let recalculatePath = punchclockPath.addResource('recalculate')
+    let punchClockPath = api.root.addResource('punch-clock');
 
     let authorizer = new apigw.TokenAuthorizer(this, 'HeroOfTheDayCustomAuthorizer', {
       handler: authorizerFn,
@@ -297,6 +316,24 @@ export class HeroOfTheDayStack extends Stack {
       }
     )
 
+    const punchClockResource = heroHeroPathResource.addResource('punch-clock');
+
+    punchClockResource.addResource('recalculate').addMethod('POST',
+      new apigw.LambdaIntegration(punchClockRecalculateFn, { proxy: true }),
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
+    punchClockResource.addResource('stats').addMethod('GET',
+      new apigw.LambdaIntegration(punchClockStatsFn, { proxy: true }),
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+
     userPath.addResource('{user}').addMethod('PUT',
       new apigw.LambdaIntegration(userCreateFn, { proxy: true }), 
       {
@@ -321,9 +358,9 @@ export class HeroOfTheDayStack extends Stack {
       }
     )
 
-    const punchclockRecalculateResource = recalculatePath.addResource('{hero}');
+    const recalculatePunchClockResource = punchClockPath.addResource('recalculate');
 
-    punchclockRecalculateResource.addMethod('POST', new apigw.LambdaIntegration(punchClockRecalculateFn, { proxy: true }),
+    recalculatePunchClockResource.addMethod('POST', new apigw.LambdaIntegration(recalculatePunchClockFn, { proxy: true }),
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM

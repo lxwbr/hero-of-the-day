@@ -24,6 +24,7 @@ async fn main() -> Result<(), Error> {
                         let hero = Hero {
                             name: name.to_string(),
                             members: payload.members,
+                            channel: None
                         };
                         let hero = repository_ref.put(&hero).await?;
                         // slack::Client::new(slack::get_slack_token().await?).create_usergroup(&name.to_string());

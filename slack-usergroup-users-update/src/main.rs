@@ -2,13 +2,14 @@ use futures::prelude::*;
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use model::punch_clock::PunchClock;
 use model::schedule::Schedule;
+use model::time::{days_diff, secs_now};
 use repository::hero::HeroRepository;
 use repository::punch_clock::PunchClockRepository;
 use repository::schedule::{LastTwoSchedules, ScheduleRepository};
 use serde::{Deserialize, Serialize};
 use slack;
 use std::time::SystemTime;
-use model::time::{days_diff, secs_now};
+use model::hero::Hero;
 
 #[derive(Serialize, Deserialize)]
 struct Request {}
@@ -60,9 +61,19 @@ async fn main() -> Result<(), Error> {
 
         let schedules: Vec<Schedule> = schedules_last_two.into_iter().map(|s| s.last).collect();
 
-        slack::Client::new(slack::get_slack_token().await?)
-            .usergroups_users_update_with_schedules(schedules)
-            .await?;
+        let client = slack::Client::new(slack::get_slack_token().await?);
+
+        client.usergroups_users_update_with_schedules(schedules.clone()).await?;
+
+        let heroes: Vec<(Hero, Schedule)> = future::join_all(schedules.into_iter().map(|schedule| {
+            hero_repository_ref.get(schedule.hero.clone()).map_ok(|hero| (hero, schedule))
+        })).await.into_iter().flatten().collect();
+
+        for (hero, schedule) in heroes.into_iter() {
+            if let Some(channel) = hero.channel {
+                let _result = client.post_message(&channel, &hero.name, schedule.assignees.clone()).await;
+            }
+        }
 
         Ok::<(), Error>(())
     }))
@@ -116,7 +127,7 @@ async fn get_punch_clock_and_update(
     shift_start_time: i64,
 ) -> Result<(), Error> {
     let days = days_diff(shift_start_time.clone(), secs_now() as i64) as u64;
-    match punch_clock_repository.get(&hero, &member).await? {
+    match punch_clock_repository.get(&hero, member.clone()).await? {
         None => {
             update_punch_clock(
                 punch_clock_repository,
@@ -124,7 +135,7 @@ async fn get_punch_clock_and_update(
                 member.clone(),
                 days,
                 shift_start_time,
-                shift_start_time
+                shift_start_time,
             )
             .await
         }
@@ -136,7 +147,7 @@ async fn get_punch_clock_and_update(
                     member.clone(),
                     days + punch_clock.days,
                     punch_clock.first_punch,
-                    shift_start_time
+                    shift_start_time,
                 )
                 .await
             } else {
