@@ -1,25 +1,19 @@
 use google_jwt_verify;
 use model::user::User;
 use repository::{hero::HeroRepository, user::UserRepository};
+use aws_lambda_events::apigw::{ApiGatewayCustomAuthorizerRequest, ApiGatewayCustomAuthorizerResponse, ApiGatewayCustomAuthorizerPolicy, IamPolicyStatement};
 use lambda_runtime::{run, service_fn, LambdaEvent, Error};
-use serde_json::{json, Value};
+use serde_json::json;
 use tracing::log::info;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
-use jsonwebtoken::{dangerous_insecure_decode};
+use jsonwebtoken::dangerous_insecure_decode;
 use serde::{Serialize, Deserialize};
 use azure_jwt::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     iss: String,         // Optional. Issuer
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct APIGatewayCustomAuthorizerRequest {
-    authorization_token: String,
-    method_arn: String,
 }
 
 #[tokio::main]
@@ -35,11 +29,11 @@ async fn main() -> Result<(), Error> {
     let hero_repository_ref = &HeroRepository::new(&shared_config);
     let user_repository_ref = &UserRepository::new(&shared_config);
 
-    run(service_fn(move |event: LambdaEvent<APIGatewayCustomAuthorizerRequest>| async move {
+    run(service_fn(move |event: LambdaEvent<ApiGatewayCustomAuthorizerRequest>| async move {
         // This will slice out the `Bearer ` part of the authorization token
-        let id_token = &event.payload.authorization_token[7..];
+        let id_token = &event.payload.authorization_token.expect("missing authorization_token")[7..];
 
-        let method_arn = &event.payload.method_arn;
+        let method_arn = &event.payload.method_arn.expect("missing method_arn");
 
         let token_data = dangerous_insecure_decode::<Claims>(&id_token)?;
 
@@ -71,22 +65,25 @@ async fn main() -> Result<(), Error> {
                 .expect("Expected environment variable MS_CLIENT_ID not set");
             
             let mut az_auth = AzureAuth::new(aud).unwrap();
-            let token = az_auth.validate_token(id_token).expect("Expected valid token");
+            match az_auth.validate_token(id_token) {
+                Ok(token) => {
+                    info!("Signed-in as {:?}", token.claims.preferred_username);
     
-            info!("Signed-in as {:?}", token.claims.preferred_username);
-    
-            logged_in(
-                user_repository_ref,
-                token.claims.preferred_username
-                    .to_owned()
-                    .expect("token claims should have the preferred_username field"),
-            )
-                .await?;
-    
-            check_user(hero_repository_ref, method_arn.to_owned(), Info {
-                sub: token.claims.sub,
-                email: token.claims.preferred_username.expect("token claims should have the preferred_username field")
-            }).await
+                    logged_in(
+                        user_repository_ref,
+                        token.claims.preferred_username
+                            .to_owned()
+                            .expect("token claims should have the preferred_username field"),
+                    )
+                        .await?;
+            
+                    check_user(hero_repository_ref, method_arn.to_owned(), Info {
+                        sub: token.claims.sub,
+                        email: token.claims.preferred_username.expect("token claims should have the preferred_username field")
+                    }).await
+                },
+                Err(err) => Ok(policy(None, method_arn.clone(), err.to_string())(Effect::Deny)),
+            }
         }
     })).await?;
     Ok(())
@@ -101,14 +98,14 @@ async fn check_user(
     hero_repository_ref: &HeroRepository,
     method_arn: String,
     info: Info,
-) -> Result<Value, Error> {
+) -> Result<ApiGatewayCustomAuthorizerResponse, Error> {
     let sub = info.sub;
     let parts: Vec<&str> = method_arn.split("/").collect();
     let http_verb = parts[2];
     let resource = parts[3];
     let sub_resource = parts[4];
 
-    let apply_policy = policy(sub.clone(), method_arn.clone());
+    let apply_policy = policy(Some(sub.clone()), method_arn.clone(), "".to_string());
 
     let value = if http_verb == "POST" || http_verb == "PUT" {
         if resource == "user" {
@@ -152,24 +149,29 @@ async fn logged_in(repository: &UserRepository, email: String) -> Result<(), Err
     Ok(())
 }
 
-fn policy(principal_id: String, method_arn: String) -> impl Fn(Effect) -> Value {
+fn policy(principal_id: Option<String>, method_arn: String, context: String) -> impl Fn(Effect) -> ApiGatewayCustomAuthorizerResponse {
     move |effect| {
-        json!({
-            "principalId": principal_id,
-            "policyDocument": {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Sid": "FirstStatement",
-                        "Action": "execute-api:Invoke",
-                        "Effect": match effect {
-                            Effect::Allow => "Allow",
-                            Effect::Deny => "Deny"
-                        },
-                        "Resource": method_arn
-                    }
-                ]
-            }
-        })
+        ApiGatewayCustomAuthorizerResponse {
+            principal_id: principal_id.clone(),
+            policy_document: {
+                ApiGatewayCustomAuthorizerPolicy {
+                    version: Some("2012-10-17".to_string()),
+                    statement: vec![
+                        IamPolicyStatement {
+                            action: vec!["execute-api:Invoke".to_string()],
+                            effect: Some(
+                                match effect {
+                                    Effect::Allow => "Allow".to_string(),
+                                    Effect::Deny => "Deny".to_string()
+                                }
+                            ),
+                            resource: vec![method_arn.clone()]
+                        }
+                    ]
+                }
+            },
+            context: json!(context),
+            usage_identifier_key: None
+        }
     }
 }
