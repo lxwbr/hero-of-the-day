@@ -1,7 +1,7 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use repository::user::UserRepository;
 use model::user::User;
-use response::{ok, bad_request};
+use repository::user::UserRepository;
+use response::{bad_request, ok};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -20,12 +20,13 @@ async fn main() -> Result<(), Error> {
             Some(email) => {
                 let user = User {
                     email: email.into(),
-                    last_login: None
+                    last_login: None,
                 };
                 ok(repository_ref.put(&user).await?)
-            },
-            _ => bad_request("Expected email".into())
+            }
+            _ => bad_request("Expected email".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }

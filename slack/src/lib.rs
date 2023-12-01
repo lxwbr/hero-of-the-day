@@ -1,7 +1,7 @@
-use futures::{prelude::*};
+use aws_sdk_ssm::Client as SsmClient;
+use futures::prelude::*;
 use model::schedule::Schedule;
 use reqwest;
-use aws_sdk_ssm::{Client as SsmClient};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -73,7 +73,7 @@ struct UsergroupsUsersUpdateResponse {
 
 #[derive(Debug)]
 struct LookupError {
-    details: String
+    details: String,
 }
 
 impl Client {
@@ -118,10 +118,18 @@ impl Client {
                 .as_str(),
             )
             .send()
-            .map_err(|err| Box::new(LookupError {details: format!("send(). email: {}, error: {}", email, err.to_string())}))
+            .map_err(|err| {
+                Box::new(LookupError {
+                    details: format!("send(). email: {}, error: {}", email, err.to_string()),
+                })
+            })
             .await?
             .json()
-            .map_err(|err| Box::new(LookupError {details: format!("json(). email: {}, error: {}", email, err.to_string())}))
+            .map_err(|err| {
+                Box::new(LookupError {
+                    details: format!("json(). email: {}, error: {}", email, err.to_string()),
+                })
+            })
             .await?;
         if result.ok {
             Ok(result.user)
@@ -150,12 +158,8 @@ impl Client {
         }
     }
 
-    pub async fn create_usergroup(
-        &self,
-        usergroup_name: &String,
-    ) -> Result<(), Error> {
-        let url =
-            format!(
+    pub async fn create_usergroup(&self, usergroup_name: &String) -> Result<(), Error> {
+        let url = format!(
             "https://slack.com/api/usergroups.create?token={}&pretty=1&name={}",
             self.token, usergroup_name
         );
@@ -170,9 +174,12 @@ impl Client {
     }
 
     async fn look_up_user_ids_by_email(&self, schedule: &Schedule) -> Result<Vec<String>, Error> {
-        let result = future::try_join_all(schedule.assignees.iter().map(|assignee|
-            self.lookup_by_email(assignee.clone()).map_ok(|user| user.id)
-        )).await.map_err(|err| {
+        let result = future::try_join_all(schedule.assignees.iter().map(|assignee| {
+            self.lookup_by_email(assignee.clone())
+                .map_ok(|user| user.id)
+        }))
+        .await
+        .map_err(|err| {
             println!("{}", err.to_string());
             err
         });
@@ -183,28 +190,38 @@ impl Client {
         &self,
         schedules: Vec<Schedule>,
     ) -> Result<(), Error> {
-        let usergroup_id_map: HashMap<String, String> = self.usergroups_list().map_ok(|usergroups| usergroups.into_iter().map(|a| (a.handle, a.id)).collect()).await?;
+        let usergroup_id_map: HashMap<String, String> = self
+            .usergroups_list()
+            .map_ok(|usergroups| usergroups.into_iter().map(|a| (a.handle, a.id)).collect())
+            .await?;
 
-        let updates: Vec<Option<(&String, Vec<String>)>> = future::join_all(schedules.iter().map(|schedule| {
-            self.look_up_user_ids_by_email(schedule).map_ok(|users| {
-                match usergroup_id_map.get(&schedule.hero) {
-                    Some(usergroup_id) => {
-                        Some((usergroup_id, users))
+        let updates: Vec<Option<(&String, Vec<String>)>> =
+            future::join_all(schedules.iter().map(|schedule| {
+                self.look_up_user_ids_by_email(schedule).map_ok(|users| {
+                    match usergroup_id_map.get(&schedule.hero) {
+                        Some(usergroup_id) => Some((usergroup_id, users)),
+                        None => {
+                            println!("no usergroup id for {}", schedule.hero);
+                            None
+                        }
                     }
-                    None => {
-                        println!("no usergroup id for {}", schedule.hero);
-                        None
-                    }
-                }
-            })
-        })).await.into_iter().flatten().collect();
+                })
+            }))
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
 
         let filtered: Vec<(&String, Vec<String>)> = updates.into_iter().flatten().collect();
 
         future::join_all(filtered.iter().map(|(usergroup_id, user_ids)| {
-            println!("Updating usergroup_id {}: user_ids: {:?}", usergroup_id, user_ids);
+            println!(
+                "Updating usergroup_id {}: user_ids: {:?}",
+                usergroup_id, user_ids
+            );
             self.usergroups_users_update(usergroup_id, user_ids.as_ref())
-        })).await;
+        }))
+        .await;
 
         Ok(())
     }
