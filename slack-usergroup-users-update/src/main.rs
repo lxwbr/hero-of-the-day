@@ -1,11 +1,11 @@
-use futures::{prelude::*};
+use futures::prelude::*;
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use model::schedule::Schedule;
-use repository::schedule::ScheduleRepository;
 use repository::hero::HeroRepository;
+use repository::schedule::ScheduleRepository;
+use serde::{Deserialize, Serialize};
 use slack;
 use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 struct Request {}
@@ -30,23 +30,33 @@ async fn main() -> Result<(), Error> {
 
         let hero_names = hero_repository_ref.list().await?;
 
-        let repeating_schedules: Vec<Schedule> = future::try_join_all(hero_names.iter()
-        .map(|hero| {
-            schedule_repository_ref.get_all_repeating_before(hero.name.clone(), secs)
-        })).await?.into_iter().flatten().collect();
+        let repeating_schedules: Vec<Schedule> =
+            future::try_join_all(hero_names.iter().map(|hero| {
+                schedule_repository_ref.get_all_repeating_before(hero.name.clone(), secs)
+            }))
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
 
         println!("Repeating schedules: {:#?}", repeating_schedules);
 
-        let schedules: Vec<Schedule> = future::try_join_all(hero_names.iter()
-        .map(|hero| {
-            schedule_repository_ref.get_first_before(hero.name.clone(), secs)
-        })).await?.into_iter().flatten().collect();
+        let schedules: Vec<Schedule> = future::try_join_all(
+            hero_names
+                .iter()
+                .map(|hero| schedule_repository_ref.get_first_before(hero.name.clone(), secs)),
+        )
+        .await?
+        .into_iter()
+        .flatten()
+        .collect();
 
         slack::Client::new(slack::get_slack_token().await?)
             .usergroups_users_update_with_schedules(schedules)
             .await?;
 
         Ok::<(), Error>(())
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }
