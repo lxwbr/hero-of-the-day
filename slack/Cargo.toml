@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.145", features = ["derive"] }
-reqwest = { version = "0.11.3", features = ["json"] }
-futures = "0.3.4"
-aws-config = "0.49"
-aws-sdk-ssm = "0.19"
+serde = { worspace = true }
+reqwest = { workspace = true }
+futures = { workspace = true }
+aws-config = { workspace = true }
+aws-sdk-ssm = { workspace = true }
 model = { path = "../model" }
