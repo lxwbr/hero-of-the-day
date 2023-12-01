@@ -73,7 +73,7 @@ dependencies = [
  "azure_jwt",
  "google-jwt-verify",
  "jsonwebtoken",
- "lambda_runtime 0.3.0",
+ "lambda_runtime",
  "model",
  "openssl",
  "repository",
@@ -81,7 +81,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1060,7 +1060,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1077,7 +1077,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1094,7 +1094,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1111,7 +1111,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1129,7 +1129,7 @@ dependencies = [
  "slack",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1432,7 +1432,7 @@ dependencies = [
  "http",
  "http-body 0.4.5",
  "hyper 0.14.27",
- "lambda_runtime 0.8.3",
+ "lambda_runtime",
  "mime",
  "percent-encoding",
  "serde",
@@ -1440,26 +1440,6 @@ dependencies = [
  "serde_urlencoded",
  "tokio-stream",
  "url",
-]
-
-[[package]]
-name = "lambda_runtime"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9b08856997d11ca8122121b26b17a27ef1dce689d71ccd754e051f2417aebdd"
-dependencies = [
- "async-stream",
- "bytes 1.5.0",
- "futures",
- "http",
- "hyper 0.14.27",
- "serde",
- "serde_json",
- "tokio 1.34.0",
- "tokio-stream",
- "tower-service",
- "tracing",
- "tracing-error",
 ]
 
 [[package]]
@@ -1539,14 +1519,14 @@ name = "migrate"
 version = "0.1.0"
 dependencies = [
  "aws-config",
- "lambda_runtime 0.3.0",
+ "lambda_runtime",
  "model",
  "repository",
  "serde",
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2184,6 +2164,7 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
+ "chrono",
  "lambda_http",
  "model",
  "repository",
@@ -2192,7 +2173,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2212,7 +2193,7 @@ dependencies = [
  "slack",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2430,7 +2411,7 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "futures",
- "lambda_runtime 0.3.0",
+ "lambda_runtime",
  "model",
  "repository",
  "response",
@@ -2439,7 +2420,7 @@ dependencies = [
  "slack",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2769,17 +2750,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
- "valuable",
-]
-
-[[package]]
-name = "tracing-error"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4d7c0b83d4a500748fa5879461652b361edf5c9d51ede2a2ac03875ca185e24"
-dependencies = [
- "tracing",
- "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -2790,17 +2760,6 @@ checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
  "pin-project",
  "tracing",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
-dependencies = [
- "sharded-slab",
- "thread_local",
- "tracing-core",
 ]
 
 [[package]]
@@ -2898,7 +2857,7 @@ dependencies = [
  "serde_json",
  "tokio 1.34.0",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2906,12 +2865,6 @@ name = "uuid"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
-
-[[package]]
-name = "valuable"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "vcpkg"

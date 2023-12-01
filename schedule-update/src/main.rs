@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
-use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use repository::schedule::{ScheduleRepository, Operation};
-use repository::hero::{HeroRepository};
-use response::{ok, bad_request};
-use serde::{Deserialize};
-use serde_json::{json};
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
+use lambda_http::{run, service_fn, Error, Request, RequestExt, RequestPayloadExt};
+use repository::hero::HeroRepository;
+use repository::schedule::{Operation, ScheduleRepository};
+use response::{bad_request, ok};
+use serde::Deserialize;
+use serde_json::json;
 use slack;
 
 #[tokio::main]
@@ -94,10 +94,7 @@ async fn main() -> Result<(), Error> {
 
 fn midnight(timezone: &str) -> DateTime<Tz> {
     let tz: Tz = timezone.parse().unwrap();
-    Utc::now()
-        .with_timezone(&tz)
-        .date()
-        .and_hms(0, 0, 0)
+    Utc::now().with_timezone(&tz).date().and_hms(0, 0, 0)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -106,5 +103,5 @@ struct Payload {
     shift_start_time: String,
     assignees: Vec<String>,
     repeat_every_n_days: Option<i64>,
-    operation: String
+    operation: String,
 }

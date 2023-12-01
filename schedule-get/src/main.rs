@@ -1,7 +1,8 @@
-use lambda_http::{run, service_fn, Error, Request, RequestExt, aws_lambda_events::chrono::{DateTime, Utc}};
+use chrono::{DateTime, Utc};
+use lambda_http::{run, service_fn, Error, Request, RequestExt, RequestPayloadExt};
 use repository::schedule::ScheduleRepository;
-use response::{ok, bad_request};
-use serde::{Deserialize};
+use response::{bad_request, ok};
+use serde::Deserialize;
 
 fn to_epoch_seconds(string: &str) -> i64 {
     let date_time = DateTime::parse_from_rfc3339(string)
@@ -26,13 +27,19 @@ async fn main() -> Result<(), Error> {
     run(service_fn(move |event: Request| async move {
         match event.path_parameters().first("hero") {
             Some(hero) => {
-                let between = event.payload::<Payload>()?.map(|payload| (to_epoch_seconds(payload.start_timestamp.as_str()), to_epoch_seconds(payload.end_timestamp.as_str())));
+                let between = event.payload::<Payload>()?.map(|payload| {
+                    (
+                        to_epoch_seconds(payload.start_timestamp.as_str()),
+                        to_epoch_seconds(payload.end_timestamp.as_str()),
+                    )
+                });
                 let schedules = repository_ref.get(hero.into(), between).await?;
                 ok(schedules)
-            },
-            _ => bad_request("Hero parameter missing".into())
+            }
+            _ => bad_request("Hero parameter missing".into()),
         }
-    })).await?;
+    }))
+    .await?;
     Ok(())
 }
 
