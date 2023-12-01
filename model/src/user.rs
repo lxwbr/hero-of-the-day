@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aws_sdk_dynamodb::model::AttributeValue;
+use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 

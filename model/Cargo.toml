@@ -5,6 +5,6 @@ authors = ["Alex Weber <lexwbr@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-aws-sdk-dynamodb = "0.19.0"
-serde = "1.0.145"
-chrono = "0.4.22"
+aws-sdk-dynamodb = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }

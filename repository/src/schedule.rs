@@ -1,9 +1,12 @@
-use maplit::hashmap;
 use aws_config::SdkConfig;
-use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
+use aws_sdk_dynamodb::{
+    types::{AttributeValue, ReturnValue},
+    Client,
+};
+use futures::future;
+use maplit::hashmap;
 use model::schedule::Schedule;
 use std::env;
-use futures::future;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -37,14 +40,21 @@ impl ScheduleRepository {
         }
     }
 
-    pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> ScheduleRepository {
+    pub fn new_with_table_name(
+        shared_config: &SdkConfig,
+        table_name: String,
+    ) -> ScheduleRepository {
         ScheduleRepository {
             client: Client::new(&shared_config),
-            table_name: env::var(table_name).unwrap()
+            table_name: env::var(table_name).unwrap(),
         }
     }
 
-    pub async fn get(&self, hero: String, between: Option<(i64, i64)>) -> Result<Vec<Schedule>, Error> {
+    pub async fn get(
+        &self,
+        hero: String,
+        between: Option<(i64, i64)>,
+    ) -> Result<Vec<Schedule>, Error> {
         let mut attribute_values = hashmap! {
             ":hero".to_string() => AttributeValue::S(hero)
         };
@@ -54,10 +64,14 @@ impl ScheduleRepository {
         if let Some((start_time, end_time)) = between {
             attribute_values.insert(":s".to_string(), AttributeValue::N(start_time.to_string()));
             attribute_values.insert(":e".to_string(), AttributeValue::N(end_time.to_string()));
-            key_condition_expression = format!("{} shift_start_time BETWEEN :s AND :e", key_condition_expression);
+            key_condition_expression = format!(
+                "{} shift_start_time BETWEEN :s AND :e",
+                key_condition_expression
+            );
         }
 
-        let schedules = self.client
+        let schedules = self
+            .client
             .query()
             .key_condition_expression(key_condition_expression)
             .set_expression_attribute_values(Some(attribute_values))
@@ -65,7 +79,6 @@ impl ScheduleRepository {
             .send()
             .await?
             .items()
-            .unwrap_or_default()
             .into_iter()
             .map(Schedule::from_dynamo_item)
             .collect();
@@ -85,11 +98,15 @@ impl ScheduleRepository {
             Operation::Delete => "DELETE assignees :a".to_string(),
         };
 
-        let update_item_output = self.client
+        let update_item_output = self
+            .client
             .update_item()
             .table_name(&self.table_name)
             .key("hero", AttributeValue::S(hero.clone()))
-            .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+            .key(
+                "shift_start_time",
+                AttributeValue::N(shift_start_time.to_string()),
+            )
             .update_expression(update_expression)
             .expression_attribute_values(":a", AttributeValue::Ss(assignees))
             .return_values(ReturnValue::AllNew)
@@ -97,7 +114,9 @@ impl ScheduleRepository {
             .await?;
 
         let schedule = Schedule::from_dynamo_item(
-            update_item_output.attributes().expect("Expected attributes from the UpdateItemInput."),
+            update_item_output
+                .attributes()
+                .expect("Expected attributes from the UpdateItemInput."),
         );
 
         if schedule.assignees.is_empty() {
@@ -105,7 +124,10 @@ impl ScheduleRepository {
                 .delete_item()
                 .table_name(&self.table_name)
                 .key("hero", AttributeValue::S(hero.clone()))
-                .key("shift_start_time", AttributeValue::N(shift_start_time.to_string()))
+                .key(
+                    "shift_start_time",
+                    AttributeValue::N(shift_start_time.to_string()),
+                )
                 .send()
                 .await?;
             Ok(None)
@@ -145,7 +167,7 @@ impl ScheduleRepository {
     pub async fn get_all_repeating_before(
         &self,
         hero: String,
-        timestamp: u64
+        timestamp: u64,
     ) -> Result<Vec<Schedule>, Error> {
         let schedules: Vec<Schedule> = self
             .client
@@ -166,14 +188,14 @@ impl ScheduleRepository {
     }
 
     pub async fn list(&self) -> Result<Vec<Schedule>, Error> {
-        let response = self.client
+        let response = self
+            .client
             .scan()
             .table_name(&self.table_name)
             .send()
             .await?;
         let heroes: Vec<Schedule> = response
             .items()
-            .unwrap_or_default()
             .into_iter()
             .map(Schedule::from_dynamo_item)
             .collect();
@@ -185,7 +207,10 @@ impl ScheduleRepository {
             .put_item()
             .table_name(&self.table_name)
             .item("hero", AttributeValue::S(schedule.hero.to_string()))
-            .item("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
+            .item(
+                "shift_start_time",
+                AttributeValue::N(schedule.shift_start_time.to_string()),
+            )
             .item("assignees", AttributeValue::Ss(schedule.assignees.clone()))
             .send()
             .await?;
@@ -195,14 +220,18 @@ impl ScheduleRepository {
     pub async fn delete(&self, hero_name: String) -> Result<(), Error> {
         let schedules = self.get(hero_name, None).await?;
 
-        let _ = future::try_join_all(schedules.iter().map(|schedule|
+        let _ = future::try_join_all(schedules.iter().map(|schedule| {
             self.client
-            .delete_item()
-            .table_name(&self.table_name)
-            .key("hero", AttributeValue::S(schedule.hero.to_string()))
-            .key("shift_start_time", AttributeValue::N(schedule.shift_start_time.to_string()))
-            .send()
-        )).await?;
+                .delete_item()
+                .table_name(&self.table_name)
+                .key("hero", AttributeValue::S(schedule.hero.to_string()))
+                .key(
+                    "shift_start_time",
+                    AttributeValue::N(schedule.shift_start_time.to_string()),
+                )
+                .send()
+        }))
+        .await?;
         Ok(())
     }
 }
