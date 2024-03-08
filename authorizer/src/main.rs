@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::log::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -23,9 +22,14 @@ struct Claims {
 async fn main() -> Result<(), Error> {
     // required to enable CloudWatch error logging by the runtime
     tracing_subscriber::fmt()
+        .json()
         .with_max_level(tracing::Level::INFO)
+        // this needs to be set to remove duplicated information in the log.
+        .with_current_span(false)
         // disabling time is handy because CloudWatch will add the ingestion time.
         .without_time()
+        // remove the name of the function from every log entry
+        .with_target(false)
         .init();
 
     let shared_config = aws_config::load_from_env().await;
@@ -34,6 +38,8 @@ async fn main() -> Result<(), Error> {
 
     run(service_fn(
         move |event: LambdaEvent<ApiGatewayCustomAuthorizerRequest>| async move {
+            tracing::info!("Logging works");
+
             // This will slice out the `Bearer ` part of the authorization token
             let id_token = &event
                 .payload
@@ -44,7 +50,7 @@ async fn main() -> Result<(), Error> {
 
             let token_data = dangerous_insecure_decode::<Claims>(&id_token)?;
 
-            info!("Logging in with iss: {:?}", token_data.claims.iss);
+            tracing::info!("Logging in with iss: {:?}", token_data.claims.iss);
 
             if token_data.claims.iss.contains("google") {
                 let google_client_id_env = "GOOGLE_CLIENT_ID";
@@ -58,7 +64,7 @@ async fn main() -> Result<(), Error> {
                     .expect("Expected token to be valid");
 
                 let email = verified_token.get_payload().get_email();
-                info!("Signed-in as {:?}", email);
+                tracing::info!("Signed-in as {:?}", email);
 
                 logged_in(user_repository_ref, email.to_owned()).await?;
 
@@ -75,10 +81,10 @@ async fn main() -> Result<(), Error> {
                 let aud = env::var("MS_CLIENT_ID")
                     .expect("Expected environment variable MS_CLIENT_ID not set");
 
-                let mut az_auth = AzureAuth::new(aud).unwrap();
+                let mut az_auth = AzureAuth::new(aud).expect("Failed to create AzureAuth");
                 match az_auth.validate_token(id_token) {
                     Ok(token) => {
-                        info!("Signed-in as {:?}", token.claims.preferred_username);
+                        tracing::info!("Signed-in as {:?}", token.claims.preferred_username);
 
                         logged_in(
                             user_repository_ref,
@@ -90,7 +96,7 @@ async fn main() -> Result<(), Error> {
                         )
                         .await?;
 
-                        check_user(
+                        let policy = check_user(
                             hero_repository_ref,
                             method_arn.to_owned(),
                             Info {
@@ -100,11 +106,16 @@ async fn main() -> Result<(), Error> {
                                 ),
                             },
                         )
-                        .await
+                        .await;
+                        tracing::info!("Policy: {:?}", policy);
+                        policy
                     }
-                    Err(err) => Ok(policy(None, method_arn.clone(), err.to_string())(
-                        Effect::Deny,
-                    )),
+                    Err(err) => {
+                        tracing::error!("Error validating token: {:?}", err);
+                        Ok(policy(None, method_arn.clone(), Some(err.to_string()))(
+                            Effect::Deny,
+                        ))
+                    }
                 }
             }
         },
@@ -129,28 +140,31 @@ async fn check_user(
     let resource = parts[3];
     let sub_resource = parts[4];
 
-    let apply_policy = policy(Some(sub.clone()), method_arn.clone(), "".to_string());
+    let apply_policy = policy(Some(sub.clone()), method_arn.clone(), None);
 
     let value = if http_verb == "POST" || http_verb == "PUT" {
         if resource == "user" {
+            tracing::info!("ALLOW POST and PUT on user");
             apply_policy(Effect::Allow)
         } else {
             let email = info.email;
             if http_verb == "PUT" {
+                tracing::info!("ALLOW PUT");
                 apply_policy(Effect::Allow)
             } else {
                 let hero = hero_repository_ref.get(sub_resource.to_string()).await?;
-                info!("email: {} in {:?}", email, hero.members);
+                tracing::info!("email: {} in {:?}", email, hero.members);
                 if hero.members.contains(&email) {
-                    info!("ALLOW");
+                    tracing::info!("ALLOW");
                     apply_policy(Effect::Allow)
                 } else {
-                    info!("DENY");
+                    tracing::info!("DENY");
                     apply_policy(Effect::Deny)
                 }
             }
         }
     } else {
+        tracing::info!("ALLOW GET and DELETE");
         apply_policy(Effect::Allow)
     };
 
@@ -176,7 +190,7 @@ async fn logged_in(repository: &UserRepository, email: String) -> Result<(), Err
 fn policy(
     principal_id: Option<String>,
     method_arn: String,
-    context: String,
+    context: Option<String>,
 ) -> impl Fn(Effect) -> ApiGatewayCustomAuthorizerResponse {
     move |effect| ApiGatewayCustomAuthorizerResponse {
         principal_id: principal_id.clone(),
