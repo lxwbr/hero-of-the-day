@@ -26,7 +26,4 @@
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.21"
   },
-  "optionalDependencies": {
-    "rust.aws-cdk-lambda": "^1.2.1"
-  }
 }

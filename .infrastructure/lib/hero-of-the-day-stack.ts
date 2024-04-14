@@ -1,6 +1,6 @@
 import {CfnOutput, Duration, Stack, StackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
-import {RustFunction, Settings} from 'rust.aws-cdk-lambda';
+import {RustFunction} from 'cargo-lambda-cdk';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import {AttributeType, BillingMode, ITable} from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
@@ -25,7 +25,6 @@ export class HeroOfTheDayStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps & Environment) {
     super(scope, id, props);
     this.env = props;
-    Settings.WORKSPACE_DIR = '..';
 
     let heroTable: ITable = this.heroTable();
     let userTable: ITable = this.userTable();
@@ -115,7 +114,7 @@ export class HeroOfTheDayStack extends Stack {
 
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
-      directory: `../lambdas/${name}`,
+      manifestPath: `../lambdas/${name}`,
       functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
       environment: {
