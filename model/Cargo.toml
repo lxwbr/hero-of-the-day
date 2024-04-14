@@ -8,4 +8,6 @@ edition = "2021"
 aws-sdk-dynamodb = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 tracing = { workspace = true }
+bdays = "0.1.3"
