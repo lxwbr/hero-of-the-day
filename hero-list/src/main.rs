@@ -2,7 +2,6 @@ use lambda_http::{run, service_fn, Error, Request};
 use model::hero::Hero;
 use repository::hero::HeroRepository;
 use response::ok;
-use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -10,6 +9,7 @@ async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
         .json()
         .with_max_level(tracing::Level::INFO)
+        .flatten_event(true)
         // this needs to be set to remove duplicated information in the log.
         .with_current_span(false)
         // disabling time is handy because CloudWatch will add the ingestion time.

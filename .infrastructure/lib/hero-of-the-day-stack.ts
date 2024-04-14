@@ -1,22 +1,19 @@
-import { Stack, StackProps, CfnOutput, Duration } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import { RustFunction } from 'rust.aws-cdk-lambda';
+import {CfnOutput, Duration, Stack, StackProps} from 'aws-cdk-lib';
+import {Construct} from 'constructs';
+import {RustFunction} from 'cargo-lambda-cdk';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import {AttributeType, BillingMode, ITable} from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
-import { AttributeType, BillingMode, ITable, Table } from 'aws-cdk-lib/aws-dynamodb';
-import { IFunction } from 'aws-cdk-lib/aws-lambda';
-import { IRule, Rule, Schedule } from 'aws-cdk-lib/aws-events';
-import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
-import { IParameter, StringParameter } from 'aws-cdk-lib/aws-ssm';
+import {IFunction} from 'aws-cdk-lib/aws-lambda';
+import {IRule, Rule, Schedule} from 'aws-cdk-lib/aws-events';
+import {LambdaFunction} from 'aws-cdk-lib/aws-events-targets';
+import {IParameter, StringParameter} from 'aws-cdk-lib/aws-ssm';
 
 const heroOfTheDay = 'hero-of-the-day'
 const environment = {
   "HERO_TABLE": `${heroOfTheDay}-hero`,
   "USER_TABLE": `${heroOfTheDay}-user`,
   "SCHEDULE_TABLE": `${heroOfTheDay}-schedule`,
-  "OLD_HERO_TABLE": 'hero-of-the-day-dev-hero',
-  "OLD_SCHEDULE_TABLE": 'hero-of-the-day-dev-schedule',
-  "OLD_USER_TABLE": 'hero-of-the-day-dev-user',
   "HOSTED_DOMAIN": 'xxx',
   "GOOGLE_CLIENT_ID": 'xxx',
   "MS_CLIENT_ID": 'xxx',
@@ -46,22 +43,18 @@ export class HeroOfTheDayStack extends Stack {
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
-    this.migrate(heroTable, userTable, scheduleTable);
-
     this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
-    let rule = new Rule(this, 'SlackUsergroupUsersUpdateScheduleRule', {
-      schedule: Schedule.cron({ minute: '0', hour: '0' }),
+    return new Rule(this, 'SlackUsergroupUsersUpdateScheduleRule', {
+      schedule: Schedule.cron({minute: '0', hour: '0'}),
       targets: [new LambdaFunction(slackUsergroupUsersUpdateFn)],
-     });
-
-    return rule;
+    });
   }
 
   heroTable(): ITable {
-    let table = new dynamodb.Table(this, environment.HERO_TABLE, {
+    return new dynamodb.Table(this, environment.HERO_TABLE, {
       tableName: environment.HERO_TABLE,
       partitionKey: {
         name: 'name',
@@ -69,11 +62,10 @@ export class HeroOfTheDayStack extends Stack {
       },
       billingMode: BillingMode.PAY_PER_REQUEST
     });
-    return table;
   }
 
   userTable(): ITable {
-    let table = new dynamodb.Table(this, environment.USER_TABLE, {
+    return new dynamodb.Table(this, environment.USER_TABLE, {
       tableName: environment.USER_TABLE,
       partitionKey: {
         name: 'email',
@@ -81,11 +73,10 @@ export class HeroOfTheDayStack extends Stack {
       },
       billingMode: BillingMode.PAY_PER_REQUEST
     });
-    return table;
   }
 
   scheduleTable(): ITable {
-    let table = new dynamodb.Table(this, environment.SCHEDULE_TABLE, {
+    return new dynamodb.Table(this, environment.SCHEDULE_TABLE, {
       tableName: environment.SCHEDULE_TABLE,
       partitionKey: {
         name: 'hero',
@@ -97,31 +88,15 @@ export class HeroOfTheDayStack extends Stack {
       },
       billingMode: BillingMode.PAY_PER_REQUEST
     });
-    return table;
   }
 
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
-      package: name,
-      environment,
+      manifestPath: `../${name}/Cargo.toml`,
       functionName: `${heroOfTheDay}-${name}`,
-      timeout
+      timeout,
+      environment
     });
-  }
-
-  migrate(heroTable: ITable, userTable: ITable, scheduleTable: ITable): IFunction {
-    let oldHeroTable = Table.fromTableArn(this, 'OldHeroTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_HERO_TABLE}`);
-    let oldUserTable = Table.fromTableArn(this, 'OldUserTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_USER_TABLE}`);
-    let oldScheduleTable = Table.fromTableArn(this, 'OldScheduleTable', `arn:aws:dynamodb:eu-central-1:514130831484:table/${environment.OLD_SCHEDULE_TABLE}`);
-
-    let fn = this.createFn('MigrateFunction', 'migrate', Duration.seconds(50));
-    heroTable.grantReadWriteData(fn);
-    userTable.grantReadWriteData(fn);
-    scheduleTable.grantReadWriteData(fn);
-    oldHeroTable.grantReadData(fn);
-    oldUserTable.grantReadData(fn);
-    oldScheduleTable.grantReadData(fn);
-    return fn;
   }
 
   authorizer(heroTable: ITable, userTable: ITable): IFunction {
