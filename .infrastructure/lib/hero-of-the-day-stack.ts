@@ -1,6 +1,6 @@
 import {CfnOutput, Duration, Stack, StackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
-import {RustFunction} from 'cargo-lambda-cdk';
+import {RustFunction, Settings} from 'rust.aws-cdk-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import {AttributeType, BillingMode, ITable} from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
@@ -8,9 +8,6 @@ import {IFunction} from 'aws-cdk-lib/aws-lambda';
 import {IRule, Rule, Schedule} from 'aws-cdk-lib/aws-events';
 import {LambdaFunction} from 'aws-cdk-lib/aws-events-targets';
 import {IParameter, StringParameter} from 'aws-cdk-lib/aws-ssm';
-import * as path from "path";
-
-const BASE_PATH = path.join(__dirname, '..', '..');
 
 interface Environment {
   readonly APP_NAME: string;
@@ -28,6 +25,7 @@ export class HeroOfTheDayStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps & Environment) {
     super(scope, id, props);
     this.env = props;
+    Settings.WORKSPACE_DIR = '..';
 
     let heroTable: ITable = this.heroTable();
     let userTable: ITable = this.userTable();
@@ -117,20 +115,18 @@ export class HeroOfTheDayStack extends Stack {
 
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
-      manifestPath: path.join(BASE_PATH, 'lambdas', name),
+      directory: `../lambdas/${name}/Cargo.toml`,
       functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
-      bundling: {
-        environment: {
-          APP_NAME: this.env.APP_NAME,
-          HERO_TABLE: this.env.HERO_TABLE,
-          USER_TABLE: this.env.USER_TABLE,
-          PUNCH_CLOCK_TABLE: this.env.PUNCH_CLOCK_TABLE,
-          SCHEDULE_TABLE: this.env.SCHEDULE_TABLE,
-          HOSTED_DOMAIN: this.env.HOSTED_DOMAIN,
-          MS_CLIENT_ID: this.env.MS_CLIENT_ID,
-          SLACK_TOKEN_PARAMETER: this.env.SLACK_TOKEN_PARAMETER
-        }
+      environment: {
+        APP_NAME: this.env.APP_NAME,
+        HERO_TABLE: this.env.HERO_TABLE,
+        USER_TABLE: this.env.USER_TABLE,
+        PUNCH_CLOCK_TABLE: this.env.PUNCH_CLOCK_TABLE,
+        SCHEDULE_TABLE: this.env.SCHEDULE_TABLE,
+        HOSTED_DOMAIN: this.env.HOSTED_DOMAIN,
+        MS_CLIENT_ID: this.env.MS_CLIENT_ID,
+        SLACK_TOKEN_PARAMETER: this.env.SLACK_TOKEN_PARAMETER
       }
     });
   }
