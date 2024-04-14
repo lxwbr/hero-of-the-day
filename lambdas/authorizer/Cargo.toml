@@ -9,18 +9,17 @@ vendored-openssl = ["openssl/vendored"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aws-config = { version = "1.2.0", features = ["behavior-version-latest"] }
-aws-sdk-dynamodb = "1.22"
-aws_lambda_events = "0.15.0"
-azure_jwt = "0.2.2"
-tokio = { version = "1.37.0", features = ["macros"] }
-lambda_runtime = "0.11.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tracing = { version = "0.1.40", features = ["log"] }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt", "json"] }
+aws-config = { workspace = true }
+tokio = { workspace = true }
+lambda_runtime = { workspace = true }
+aws-sdk-dynamodb = { workspace = true }
+aws_lambda_events = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 jsonwebtoken = "7.2.0"
-openssl = { version = '0.10', features = ["vendored"] }
-
+azure_jwt = "0.2.2"
 repository = { path = "../../repository" }
 model = { path = "../../model" }
+openssl = { version = '0.10', features = ["vendored"] }
