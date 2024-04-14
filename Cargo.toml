@@ -1,23 +1,12 @@
-[workspace]
 resolver = "2"
+
+[workspace]
 members = [
+    "lambdas/*",
     "response",
-    "authorizer",
     "repository",
-    "schedule-get",
-    "schedule-update",
     "slack",
-    "slack-usergroup-users-update",
-    "hero-list",
-    "hero-put",
-    "hero-get",
-    "hero-delete",
-    "hero-delete-member",
-    "user-create",
     "model",
-    "punch-clock-recalculate",
-    "punch-clock-recalculate-all",
-    "punch-clock-stats",
 ]
 
 [workspace.dependencies]

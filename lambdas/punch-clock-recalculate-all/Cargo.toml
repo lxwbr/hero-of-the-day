@@ -1,5 +1,5 @@
 [package]
-name = "punch-clock-stats"
+name = "punch-clock-recalculate-all"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,6 +18,6 @@ tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 
-model = { path = "../model" }
-repository = { path = "../repository" }
-response = { path = "../response" }
+model = { path = "../../model" }
+repository = { path = "../../repository" }
+response = { path = "../../response" }
