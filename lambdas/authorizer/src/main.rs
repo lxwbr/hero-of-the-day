@@ -3,7 +3,6 @@ use aws_lambda_events::apigw::{
     ApiGatewayCustomAuthorizerResponse, IamPolicyStatement,
 };
 use azure_jwt::*;
-use google_jwt_verify;
 use jsonwebtoken::dangerous_insecure_decode;
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use model::user::User;
@@ -52,70 +51,43 @@ async fn main() -> Result<(), Error> {
 
             tracing::info!("Logging in with iss: {:?}", token_data.claims.iss);
 
-            if token_data.claims.iss.contains("google") {
-                let google_client_id_env = "GOOGLE_CLIENT_ID";
+            let aud = env::var("MS_CLIENT_ID")
+                .expect("Expected environment variable MS_CLIENT_ID not set");
 
-                let google_client_id = env::var(google_client_id_env)
-                    .expect("Expected environment variable GOOGLE_CLIENT_ID not set");
+            let mut az_auth = AzureAuth::new(aud).expect("Failed to create AzureAuth");
+            match az_auth.validate_token(id_token) {
+                Ok(token) => {
+                    tracing::info!("Signed-in as {:?}", token.claims.preferred_username);
 
-                let google_client = google_jwt_verify::Client::new(google_client_id.as_str());
-                let verified_token = google_client
-                    .verify_id_token(id_token)
-                    .expect("Expected token to be valid");
-
-                let email = verified_token.get_payload().get_email();
-                tracing::info!("Signed-in as {:?}", email);
-
-                logged_in(user_repository_ref, email.to_owned()).await?;
-
-                check_user(
-                    hero_repository_ref,
-                    method_arn.to_owned(),
-                    Info {
-                        sub: verified_token.get_claims().get_subject(),
-                        email,
-                    },
-                )
-                .await
-            } else {
-                let aud = env::var("MS_CLIENT_ID")
-                    .expect("Expected environment variable MS_CLIENT_ID not set");
-
-                let mut az_auth = AzureAuth::new(aud).expect("Failed to create AzureAuth");
-                match az_auth.validate_token(id_token) {
-                    Ok(token) => {
-                        tracing::info!("Signed-in as {:?}", token.claims.preferred_username);
-
-                        logged_in(
-                            user_repository_ref,
-                            token
-                                .claims
-                                .preferred_username
-                                .to_owned()
-                                .expect("token claims should have the preferred_username field"),
-                        )
+                    logged_in(
+                        user_repository_ref,
+                        token
+                            .claims
+                            .preferred_username
+                            .to_owned()
+                            .expect("token claims should have the preferred_username field"),
+                    )
                         .await?;
 
-                        let policy = check_user(
-                            hero_repository_ref,
-                            method_arn.to_owned(),
-                            Info {
-                                sub: token.claims.sub,
-                                email: token.claims.preferred_username.expect(
-                                    "token claims should have the preferred_username field",
-                                ),
-                            },
-                        )
+                    let policy = check_user(
+                        hero_repository_ref,
+                        method_arn.to_owned(),
+                        Info {
+                            sub: token.claims.sub,
+                            email: token.claims.preferred_username.expect(
+                                "token claims should have the preferred_username field",
+                            ),
+                        },
+                    )
                         .await;
-                        tracing::info!("Policy: {:?}", policy);
-                        policy
-                    }
-                    Err(err) => {
-                        tracing::error!("Error validating token: {:?}", err);
-                        Ok(policy(None, method_arn.clone(), Some(err.to_string()))(
-                            Effect::Deny,
-                        ))
-                    }
+                    tracing::info!("Policy: {:?}", policy);
+                    policy
+                }
+                Err(err) => {
+                    tracing::error!("Error validating token: {:?}", err);
+                    Ok(policy(None, method_arn.clone(), Some(err.to_string()))(
+                        Effect::Deny,
+                    ))
                 }
             }
         },
