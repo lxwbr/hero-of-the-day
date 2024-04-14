@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Schedule {
     pub hero: String,
     pub shift_start_time: i64,
@@ -45,8 +45,8 @@ impl Serialize for Schedule {
     where
         S: Serializer,
     {
-        let naive = NaiveDateTime::from_timestamp(self.shift_start_time, 0);
-        let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
+        let naive = NaiveDateTime::from_timestamp_opt(self.shift_start_time, 0).expect("Invalid timestamp");
+        let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive, Utc);
 
         let mut s = serializer.serialize_struct("Schedule", 2)?;
         s.serialize_field("hero", &self.hero)?;

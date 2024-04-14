@@ -72,6 +72,28 @@ struct UsergroupsUsersUpdateResponse {
 }
 
 #[derive(Debug)]
+pub enum PostMessageError {
+    NotOk,
+}
+
+impl std::error::Error for PostMessageError {}
+
+impl fmt::Display for PostMessageError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PostMessageError::NotOk => {
+                write!(f, "Slack response field `ok` is false!")
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+struct PostMessageResponse {
+    ok: bool,
+}
+
+#[derive(Debug)]
 struct LookupError {
     details: String,
 }
@@ -224,6 +246,21 @@ impl Client {
         .await;
 
         Ok(())
+    }
+
+    pub async fn post_message(&self, channel_id: &String, hero: &String, assignees: Vec<String>) -> Result<(), Error> {
+        let url =
+            format!(
+                "https://slack.com/api/chat.postMessage?token={}&channel={}&text={}:%20{}&pretty=1",
+                self.token, channel_id, hero, assignees.join(",%20")
+            );
+        let result: PostMessageResponse =
+            self.client.post(url.as_str()).send().await?.json().await?;
+        if result.ok {
+            Ok(())
+        } else {
+            Err(Box::new(PostMessageError::NotOk))
+        }
     }
 }
 

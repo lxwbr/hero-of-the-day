@@ -25,5 +25,6 @@ new HeroOfTheDayStack(app, 'HeroOfTheDayStack', {
   HERO_TABLE: `${APP_NAME}-hero`,
   USER_TABLE: `${APP_NAME}-user`,
   SCHEDULE_TABLE: `${APP_NAME}-schedule`,
+  PUNCH_CLOCK_TABLE: `${APP_NAME}-punch-clock`,
   SLACK_TOKEN_PARAMETER: `/${APP_NAME}/slack-token`
 });

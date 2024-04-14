@@ -15,6 +15,12 @@ pub struct ScheduleRepository {
     table_name: String,
 }
 
+#[derive(Debug)]
+pub struct LastTwoSchedules {
+    pub last: Schedule,
+    pub previous_to_last: Option<Schedule>,
+}
+
 pub enum Operation {
     Add,
     Delete,
@@ -65,23 +71,41 @@ impl ScheduleRepository {
             attribute_values.insert(":s".to_string(), AttributeValue::N(start_time.to_string()));
             attribute_values.insert(":e".to_string(), AttributeValue::N(end_time.to_string()));
             key_condition_expression = format!(
-                "{} shift_start_time BETWEEN :s AND :e",
+                "{} AND shift_start_time BETWEEN :s AND :e",
                 key_condition_expression
             );
         }
 
-        let schedules = self
-            .client
-            .query()
-            .key_condition_expression(key_condition_expression)
-            .set_expression_attribute_values(Some(attribute_values))
-            .table_name(&self.table_name)
-            .send()
-            .await?
-            .items()
-            .into_iter()
-            .map(Schedule::from_dynamo_item)
-            .collect();
+        let mut schedules = vec![];
+        let mut exclusive_start_key = None;
+
+        loop {
+            let request = self
+                .client
+                .query()
+                .key_condition_expression(key_condition_expression.clone())
+                .set_expression_attribute_values(Some(attribute_values.clone()))
+                .table_name(&self.table_name)
+                .set_exclusive_start_key(exclusive_start_key)
+                .send()
+                .await?;
+
+
+            schedules.extend(
+                request.items()
+                    .into_iter()
+                    .map(Schedule::from_dynamo_item)
+                    .collect::<Vec<Schedule>>(),
+            );
+            match request.last_evaluated_key {
+                Some(last_evaluated_key) => {
+                    exclusive_start_key = Some(last_evaluated_key.clone());
+                }
+                None => {
+                    break;
+                }
+            }
+        }
 
         Ok(schedules)
     }
@@ -136,11 +160,12 @@ impl ScheduleRepository {
         }
     }
 
-    pub async fn get_first_before(
+    pub async fn get_last_n_before(
         &self,
         hero: String,
         timestamp: u64,
-    ) -> Result<Option<Schedule>, Error> {
+        n: i32,
+    ) -> Result<Vec<Schedule>, Error> {
         let schedules: Vec<Schedule> = self
             .client
             .query()
@@ -149,7 +174,7 @@ impl ScheduleRepository {
             .expression_attribute_values(":s", AttributeValue::N(timestamp.to_string()))
             .expression_attribute_values(":h", AttributeValue::S(hero))
             .scan_index_forward(false)
-            .limit(1)
+            .limit(n)
             .send()
             .await?
             .items
@@ -158,9 +183,46 @@ impl ScheduleRepository {
             .map(|item| Schedule::from_dynamo_item(&item))
             .collect();
         if schedules.is_empty() {
+            Ok(Vec::new())
+        } else {
+            Ok(Vec::from_iter(schedules.into_iter()))
+        }
+    }
+
+    pub async fn get_first_before(
+        &self,
+        hero: String,
+        timestamp: u64,
+    ) -> Result<Option<Schedule>, Error> {
+        let schedules: Vec<Schedule> = self.get_last_n_before(hero, timestamp, 1).await?;
+        if schedules.is_empty() {
             Ok(None)
         } else {
             Ok(Some(schedules.into_iter().nth(0).unwrap()))
+        }
+    }
+
+    pub async fn get_last_two_before(
+        &self,
+        hero: String,
+        timestamp: u64,
+    ) -> Result<Option<LastTwoSchedules>, Error> {
+        let schedules: Vec<Schedule> = self.get_last_n_before(hero, timestamp, 2).await?;
+        match schedules.len() {
+            1 => Ok(Some(LastTwoSchedules {
+                last: schedules.into_iter().last().unwrap(),
+                previous_to_last: None,
+            })),
+            2 => {
+                let mut iter = schedules.into_iter();
+                let last = iter.next().unwrap();
+                let previous_to_last = iter.next().unwrap();
+                Ok(Some(LastTwoSchedules {
+                    last,
+                    previous_to_last: Some(previous_to_last),
+                }))
+            }
+            _ => Ok(None),
         }
     }
 
