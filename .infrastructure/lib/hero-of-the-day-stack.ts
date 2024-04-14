@@ -8,6 +8,9 @@ import {IFunction} from 'aws-cdk-lib/aws-lambda';
 import {IRule, Rule, Schedule} from 'aws-cdk-lib/aws-events';
 import {LambdaFunction} from 'aws-cdk-lib/aws-events-targets';
 import {IParameter, StringParameter} from 'aws-cdk-lib/aws-ssm';
+import * as path from "path";
+
+const BASE_PATH = path.join(__dirname, '..', '..');
 
 interface Environment {
   readonly APP_NAME: string;
@@ -114,7 +117,7 @@ export class HeroOfTheDayStack extends Stack {
 
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
-      manifestPath: `../lambdas/${name}/Cargo.toml`,
+      manifestPath: path.join(BASE_PATH, 'lambdas', name),
       functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
       bundling: {
