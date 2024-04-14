@@ -1982,6 +1982,66 @@ dependencies = [
 ]
 
 [[package]]
+name = "punch-clock-recalculate"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "chrono",
+ "chrono-tz",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.34.0",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "punch-clock-recalculate-all"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "chrono",
+ "chrono-tz",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.34.0",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "punch-clock-stats"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "chrono",
+ "chrono-tz",
+ "futures",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio 1.34.0",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "query_map"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

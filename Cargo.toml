@@ -14,7 +14,10 @@ members = [
     "hero-delete",
     "hero-delete-member",
     "user-create",
-    "model"
+    "model",
+    "punch-clock-recalculate",
+    "punch-clock-recalculate-all",
+    "punch-clock-stats",
 ]
 
 [workspace.dependencies]
