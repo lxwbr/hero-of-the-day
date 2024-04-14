@@ -2,20 +2,28 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { HeroOfTheDayStack } from '../lib/hero-of-the-day-stack';
+import {Annotations} from "aws-cdk-lib";
 
 const app = new cdk.App();
+
+let APP_NAME = 'hero-of-the-day';
+let HOSTED_DOMAIN = process.env.HOSTED_DOMAIN;
+let MS_CLIENT_ID = process.env.MS_CLIENT_ID;
+if (!HOSTED_DOMAIN) {
+  Annotations.of(app).addError('Could not determine HOSTED_DOMAIN');
+  throw Error('Could not determine HOSTED_DOMAIN')
+}
+if (!MS_CLIENT_ID) {
+  Annotations.of(app).addError('Could not determine MS_CLIENT_ID');
+  throw Error('Could not determine MS_CLIENT_ID')
+}
+
 new HeroOfTheDayStack(app, 'HeroOfTheDayStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
-
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  APP_NAME,
+  HOSTED_DOMAIN,
+  MS_CLIENT_ID,
+  HERO_TABLE: `${APP_NAME}-hero`,
+  USER_TABLE: `${APP_NAME}-user`,
+  SCHEDULE_TABLE: `${APP_NAME}-schedule`,
+  SLACK_TOKEN_PARAMETER: `/${APP_NAME}/slack-token`
 });

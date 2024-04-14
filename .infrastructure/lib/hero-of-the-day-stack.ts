@@ -9,26 +9,27 @@ import {IRule, Rule, Schedule} from 'aws-cdk-lib/aws-events';
 import {LambdaFunction} from 'aws-cdk-lib/aws-events-targets';
 import {IParameter, StringParameter} from 'aws-cdk-lib/aws-ssm';
 
-const heroOfTheDay = 'hero-of-the-day'
-const environment = {
-  "HERO_TABLE": `${heroOfTheDay}-hero`,
-  "USER_TABLE": `${heroOfTheDay}-user`,
-  "SCHEDULE_TABLE": `${heroOfTheDay}-schedule`,
-  "HOSTED_DOMAIN": 'xxx',
-  "GOOGLE_CLIENT_ID": 'xxx',
-  "MS_CLIENT_ID": 'xxx',
-  "SLACK_TOKEN_PARAMETER": `/${heroOfTheDay}/slack-token`
+interface Environment {
+  readonly APP_NAME: string;
+  readonly HERO_TABLE: string,
+  readonly USER_TABLE: string,
+  readonly SCHEDULE_TABLE: string,
+  readonly HOSTED_DOMAIN: string,
+  readonly MS_CLIENT_ID: string,
+  readonly SLACK_TOKEN_PARAMETER: string
 }
 
 export class HeroOfTheDayStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  env: Environment;
+  constructor(scope: Construct, id: string, props: StackProps & Environment) {
     super(scope, id, props);
+    this.env = props;
 
     let heroTable: ITable = this.heroTable();
     let userTable: ITable = this.userTable();
     let scheduleTable: ITable = this.scheduleTable();
 
-    let slackParameter = StringParameter.fromStringParameterName(this, 'SlackParameter', environment.SLACK_TOKEN_PARAMETER);
+    let slackParameter = StringParameter.fromStringParameterName(this, 'SlackParameter', this.env.SLACK_TOKEN_PARAMETER);
 
     let authorizer: IFunction = this.authorizer(heroTable, userTable);
     let heroListFn: IFunction = this.heroList(heroTable);
@@ -54,8 +55,8 @@ export class HeroOfTheDayStack extends Stack {
   }
 
   heroTable(): ITable {
-    return new dynamodb.Table(this, environment.HERO_TABLE, {
-      tableName: environment.HERO_TABLE,
+    return new dynamodb.Table(this, this.env.HERO_TABLE, {
+      tableName: this.env.HERO_TABLE,
       partitionKey: {
         name: 'name',
         type: AttributeType.STRING
@@ -65,8 +66,8 @@ export class HeroOfTheDayStack extends Stack {
   }
 
   userTable(): ITable {
-    return new dynamodb.Table(this, environment.USER_TABLE, {
-      tableName: environment.USER_TABLE,
+    return new dynamodb.Table(this, this.env.USER_TABLE, {
+      tableName: this.env.USER_TABLE,
       partitionKey: {
         name: 'email',
         type: AttributeType.STRING
@@ -76,8 +77,8 @@ export class HeroOfTheDayStack extends Stack {
   }
 
   scheduleTable(): ITable {
-    return new dynamodb.Table(this, environment.SCHEDULE_TABLE, {
-      tableName: environment.SCHEDULE_TABLE,
+    return new dynamodb.Table(this, this.env.SCHEDULE_TABLE, {
+      tableName: this.env.SCHEDULE_TABLE,
       partitionKey: {
         name: 'hero',
         type: AttributeType.STRING
@@ -93,9 +94,17 @@ export class HeroOfTheDayStack extends Stack {
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
       manifestPath: `../${name}/Cargo.toml`,
-      functionName: `${heroOfTheDay}-${name}`,
+      functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
-      environment
+      environment: {
+        APP_NAME: this.env.APP_NAME,
+        HERO_TABLE: this.env.HERO_TABLE,
+        USER_TABLE: this.env.USER_TABLE,
+        SCHEDULE_TABLE: this.env.SCHEDULE_TABLE,
+        HOSTED_DOMAIN: this.env.HOSTED_DOMAIN,
+        MS_CLIENT_ID: this.env.MS_CLIENT_ID,
+        SLACK_TOKEN_PARAMETER: this.env.SLACK_TOKEN_PARAMETER
+      }
     });
   }
 
@@ -176,8 +185,8 @@ export class HeroOfTheDayStack extends Stack {
     heroMemberDeleteFn: IFunction,
     heroDeleteFn: IFunction
   ) {
-    const api = new apigw.RestApi(this, `${heroOfTheDay}-api`, {
-      description: heroOfTheDay,
+    const api = new apigw.RestApi(this, `${this.env.APP_NAME}-api`, {
+      description: this.env.APP_NAME,
       defaultCorsPreflightOptions: {
         statusCode: 200,
         allowHeaders: [
@@ -197,7 +206,7 @@ export class HeroOfTheDayStack extends Stack {
     let authorizer = new apigw.TokenAuthorizer(this, 'HeroOfTheDayCustomAuthorizer', {
       handler: authorizerFn,
       resultsCacheTtl: Duration.minutes(0),
-      authorizerName: `${heroOfTheDay}-authorizer`
+      authorizerName: `${this.env.APP_NAME}-authorizer`
     })
 
     heroPath.addResource('list').addMethod('GET',
