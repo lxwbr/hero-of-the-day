@@ -115,7 +115,7 @@ export class HeroOfTheDayStack extends Stack {
 
   createFn(id: string, name: string, timeout: Duration = Duration.seconds(3)): IFunction {
     return new RustFunction(this, id, {
-      directory: `../lambdas/${name}/Cargo.toml`,
+      directory: `../lambdas/${name}`,
       functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
       environment: {
