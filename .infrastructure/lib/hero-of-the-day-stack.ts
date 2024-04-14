@@ -117,15 +117,17 @@ export class HeroOfTheDayStack extends Stack {
       manifestPath: `../lambdas/${name}/Cargo.toml`,
       functionName: `${this.env.APP_NAME}-${name}`,
       timeout,
-      environment: {
-        APP_NAME: this.env.APP_NAME,
-        HERO_TABLE: this.env.HERO_TABLE,
-        USER_TABLE: this.env.USER_TABLE,
-        PUNCH_CLOCK_TABLE: this.env.PUNCH_CLOCK_TABLE,
-        SCHEDULE_TABLE: this.env.SCHEDULE_TABLE,
-        HOSTED_DOMAIN: this.env.HOSTED_DOMAIN,
-        MS_CLIENT_ID: this.env.MS_CLIENT_ID,
-        SLACK_TOKEN_PARAMETER: this.env.SLACK_TOKEN_PARAMETER
+      bundling: {
+        environment: {
+          APP_NAME: this.env.APP_NAME,
+          HERO_TABLE: this.env.HERO_TABLE,
+          USER_TABLE: this.env.USER_TABLE,
+          PUNCH_CLOCK_TABLE: this.env.PUNCH_CLOCK_TABLE,
+          SCHEDULE_TABLE: this.env.SCHEDULE_TABLE,
+          HOSTED_DOMAIN: this.env.HOSTED_DOMAIN,
+          MS_CLIENT_ID: this.env.MS_CLIENT_ID,
+          SLACK_TOKEN_PARAMETER: this.env.SLACK_TOKEN_PARAMETER
+        }
       }
     });
   }
