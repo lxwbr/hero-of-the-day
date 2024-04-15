@@ -22,4 +22,4 @@ jsonwebtoken = "7.2.0"
 azure_jwt = "0.2.2"
 repository = { path = "../../repository" }
 model = { path = "../../model" }
-openssl = { version = '0.10', features = ["vendored"] }
+openssl = { workspace = true }
