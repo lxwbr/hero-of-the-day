@@ -19,7 +19,18 @@ pub fn secs_now() -> u64 {
         .as_secs()
 }
 
-#[test]
-fn days_diff_test() {
-    assert_eq!(days_diff(1671404400, 1671490800), 1);
+#[cfg(test)]
+mod tests {
+    use crate::time::days_diff;
+
+    #[test]
+    fn days_diff_test() {
+        assert_eq!(days_diff(1671404400, 1671490800), 1);
+    }
+
+    #[test]
+    fn same_day() {
+        assert_eq!(days_diff(1671404100, 1671404400), 0);
+        assert_eq!(days_diff(1671405000, 1671404400), 0);
+    }
 }
