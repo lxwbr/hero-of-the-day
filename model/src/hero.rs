@@ -12,7 +12,6 @@ pub struct Hero {
 
 impl Hero {
     pub fn from_dynamo_item(item: &HashMap<String, AttributeValue>) -> Hero {
-        tracing::info!("from_dynamo_item: {:?}", item);
         Hero {
             name: item["name"]
                 .as_s()
