@@ -1,10 +1,12 @@
-use aws_sdk_ssm::operation::get_parameter::GetParameterOutput;
+use aws_sdk_ssm::error::SdkError;
+use aws_sdk_ssm::operation::get_parameter::{GetParameterError, GetParameterOutput};
 use aws_sdk_ssm::Client as SsmClient;
 use futures::prelude::*;
 use model::schedule::Schedule;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
+use std::env::VarError;
 use thiserror::Error;
 
 type Result<T> = std::result::Result<T, SlackError>;
@@ -25,6 +27,10 @@ pub enum SlackError {
     GetSlackTokenError(&'static str),
     #[error("Reqwest error: {0}")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Get parameter error: {0}")]
+    GetParameterError(#[from] SdkError<GetParameterError>),
+    #[error("Missing env: {0}")]
+    MissingEnvError(#[from] VarError),
 }
 
 pub struct Client {
@@ -228,12 +234,8 @@ pub async fn get_slack_token() -> Result<String> {
     let client = SsmClient::new(&shared_config);
     let response: GetParameterOutput = client
         .get_parameter()
-        .name(
-            env::var("SLACK_TOKEN_PARAMETER")
-                .map_err(|_| SlackError::GetSlackTokenError("SLACK_TOKEN_PARAMETER not set"))?,
-        )
+        .name(env::var("SLACK_TOKEN_PARAMETER")?)
         .send()
-        .map_err(|_| SlackError::GetSlackTokenError("Could not get Slack token from SSM."))
         .await?;
     let token = response
         .parameter
