@@ -71,7 +71,9 @@ async fn main() -> Result<(), Error> {
 
         for (hero, schedule) in heroes.into_iter() {
             if let Some(channel) = hero.channel {
-                let _result = client.post_message(&channel, &hero.name, schedule.assignees.clone()).await;
+                if days_diff(secs_now() as i64, schedule.shift_start_time) == 0 {
+                    client.post_message(&channel, &hero.name, schedule.assignees.clone()).await?;
+                }
             }
         }
 
