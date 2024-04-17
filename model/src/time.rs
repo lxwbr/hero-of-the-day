@@ -1,8 +1,8 @@
-use std::time::SystemTime;
-use chrono::NaiveDateTime;
-use chrono_tz::Europe::Berlin;
-use chrono::TimeZone;
 use bdays::HolidayCalendar;
+use chrono::NaiveDateTime;
+use chrono::TimeZone;
+use chrono_tz::Europe::Berlin;
+use std::time::SystemTime;
 
 // Subtracts secs0 from secs1
 pub fn days_diff(secs0: i64, secs1: i64) -> i32 {

@@ -44,7 +44,7 @@ async fn main() -> Result<(), Error> {
             None => bad_request("Could not parse JSON payload for schedule update".into()),
         }
     }))
-        .await?;
+    .await?;
     Ok(())
 }
 

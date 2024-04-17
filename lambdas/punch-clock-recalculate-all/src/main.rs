@@ -36,7 +36,7 @@ async fn main() -> Result<(), Error> {
         }
         ok(())
     }))
-        .await?;
+    .await?;
     Ok(())
 }
 

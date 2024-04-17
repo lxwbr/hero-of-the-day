@@ -45,7 +45,8 @@ impl Serialize for Schedule {
     where
         S: Serializer,
     {
-        let naive = NaiveDateTime::from_timestamp_opt(self.shift_start_time, 0).expect("Invalid timestamp");
+        let naive =
+            NaiveDateTime::from_timestamp_opt(self.shift_start_time, 0).expect("Invalid timestamp");
         let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive, Utc);
 
         let mut s = serializer.serialize_struct("Schedule", 2)?;

@@ -16,14 +16,14 @@ pub struct UserRepository {
 impl UserRepository {
     pub fn new(shared_config: &SdkConfig) -> UserRepository {
         UserRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var("USER_TABLE").unwrap(),
         }
     }
 
     pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> UserRepository {
         UserRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var(table_name).unwrap(),
         }
     }
@@ -59,7 +59,7 @@ impl UserRepository {
             .await?;
         let heroes: Vec<User> = response
             .items()
-            .into_iter()
+            .iter()
             .map(User::from_dynamo_item)
             .collect();
         Ok(heroes)

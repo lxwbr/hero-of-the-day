@@ -1,41 +1,29 @@
 use aws_sdk_ssm::Client as SsmClient;
 use futures::prelude::*;
 use model::schedule::Schedule;
-use reqwest;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
-use std::fmt;
+use thiserror::Error;
 
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+type Result<T> = std::result::Result<T, SlackError>;
 
-#[derive(Debug)]
-pub enum SlackUsergroupUsersUpdateError {
-    NotOk,
-}
-
-impl std::error::Error for SlackUsergroupUsersUpdateError {}
-
-impl fmt::Display for SlackUsergroupUsersUpdateError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SlackUsergroupUsersUpdateError::NotOk => {
-                write!(f, "Slack response field `ok` is false!")
-            }
-        }
-    }
-}
-
-impl std::error::Error for LookupError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-impl fmt::Display for LookupError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "JsonError: {}!", &self.details)
-    }
+#[derive(Error, Debug)]
+pub enum SlackError {
+    #[error("Could not update user group users.")]
+    UserGroupUsersUpdateError,
+    #[error("Could not lookup by email. {0}")]
+    UsersLookupByEmailError(String),
+    #[error("Could not list user groups")]
+    UserGroupsList,
+    #[error("Could not create user group.")]
+    CreateUserGroupError,
+    #[error("Could not post message.")]
+    PostMessageError,
+    #[error("Could not get Slack token.")]
+    GetSlackTokenError,
+    #[error("Reqwest error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
 }
 
 pub struct Client {
@@ -71,31 +59,9 @@ struct UsergroupsUsersUpdateResponse {
     ok: bool,
 }
 
-#[derive(Debug)]
-pub enum PostMessageError {
-    NotOk,
-}
-
-impl std::error::Error for PostMessageError {}
-
-impl fmt::Display for PostMessageError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            PostMessageError::NotOk => {
-                write!(f, "Slack response field `ok` is false!")
-            }
-        }
-    }
-}
-
 #[derive(Deserialize, Debug)]
 struct PostMessageResponse {
     ok: bool,
-}
-
-#[derive(Debug)]
-struct LookupError {
-    details: String,
 }
 
 impl Client {
@@ -107,7 +73,7 @@ impl Client {
     }
 
     /// Lists all Slack groups in order to have an id to handle relation.
-    pub async fn usergroups_list(&self) -> Result<Vec<Usergroup>, Error> {
+    pub async fn usergroups_list(&self) -> Result<Vec<Usergroup>> {
         let result: UsergroupsListResponse = self
             .client
             .get(
@@ -124,12 +90,12 @@ impl Client {
         if result.ok {
             Ok(result.usergroups)
         } else {
-            Err(Box::new(SlackUsergroupUsersUpdateError::NotOk))
+            Err(SlackError::UserGroupsList)
         }
     }
 
     /// Resolves Slack user id by using user's e-mail address.
-    pub async fn lookup_by_email(&self, email: String) -> Result<User, Error> {
+    pub async fn lookup_by_email(&self, email: String) -> Result<User> {
         let result: UsersLookupByEmailResponse = self
             .client
             .get(
@@ -140,31 +106,23 @@ impl Client {
                 .as_str(),
             )
             .send()
-            .map_err(|err| {
-                Box::new(LookupError {
-                    details: format!("send(). email: {}, error: {}", email, err.to_string()),
-                })
-            })
+            .map_err(|_| SlackError::UsersLookupByEmailError(email.clone()))
             .await?
             .json()
-            .map_err(|err| {
-                Box::new(LookupError {
-                    details: format!("json(). email: {}, error: {}", email, err.to_string()),
-                })
-            })
+            .map_err(|_| SlackError::UsersLookupByEmailError(email.clone()))
             .await?;
         if result.ok {
             Ok(result.user)
         } else {
-            Err(Box::new(SlackUsergroupUsersUpdateError::NotOk))
+            Err(SlackError::UsersLookupByEmailError(email))
         }
     }
 
     pub async fn usergroups_users_update(
         &self,
         usergroup_id: &String,
-        user_ids: &Vec<String>,
-    ) -> Result<(), Error> {
+        user_ids: &[String],
+    ) -> Result<()> {
         let url =
             format!(
             "https://slack.com/api/usergroups.users.update?token={}&pretty=1&usergroup={}&users={}",
@@ -176,11 +134,11 @@ impl Client {
         if result.ok {
             Ok(())
         } else {
-            Err(Box::new(SlackUsergroupUsersUpdateError::NotOk))
+            Err(SlackError::UserGroupUsersUpdateError)
         }
     }
 
-    pub async fn create_usergroup(&self, usergroup_name: &String) -> Result<(), Error> {
+    pub async fn create_usergroup(&self, usergroup_name: &String) -> Result<()> {
         let url = format!(
             "https://slack.com/api/usergroups.create?token={}&pretty=1&name={}",
             self.token, usergroup_name
@@ -191,27 +149,26 @@ impl Client {
         if result.ok {
             Ok(())
         } else {
-            Err(Box::new(SlackUsergroupUsersUpdateError::NotOk))
+            Err(SlackError::CreateUserGroupError)
         }
     }
 
-    async fn look_up_user_ids_by_email(&self, schedule: &Schedule) -> Result<Vec<String>, Error> {
-        let result = future::try_join_all(schedule.assignees.iter().map(|assignee| {
+    async fn look_up_user_ids_by_email(&self, schedule: &Schedule) -> Result<Vec<String>> {
+        future::try_join_all(schedule.assignees.iter().map(|assignee| {
             self.lookup_by_email(assignee.clone())
                 .map_ok(|user| user.id)
         }))
         .await
         .map_err(|err| {
-            println!("{}", err.to_string());
+            println!("{}", err);
             err
-        });
-        result
+        })
     }
 
     pub async fn usergroups_users_update_with_schedules(
         &self,
         schedules: Vec<Schedule>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let usergroup_id_map: HashMap<String, String> = self
             .usergroups_list()
             .map_ok(|usergroups| usergroups.into_iter().map(|a| (a.handle, a.id)).collect())
@@ -248,30 +205,38 @@ impl Client {
         Ok(())
     }
 
-    pub async fn post_message(&self, channel_id: &String, hero: &String, assignees: Vec<String>) -> Result<(), Error> {
-        let url =
-            format!(
-                "https://slack.com/api/chat.postMessage?token={}&channel={}&text={}:%20{}&pretty=1",
-                self.token, channel_id, hero, assignees.join(",%20")
-            );
+    pub async fn post_message(
+        &self,
+        channel_id: &String,
+        hero: &String,
+        assignees: Vec<String>,
+    ) -> Result<()> {
+        let url = format!(
+            "https://slack.com/api/chat.postMessage?token={}&channel={}&text={}:%20{}&pretty=1",
+            self.token,
+            channel_id,
+            hero,
+            assignees.join(",%20")
+        );
         let result: PostMessageResponse =
             self.client.post(url.as_str()).send().await?.json().await?;
         if result.ok {
             Ok(())
         } else {
-            Err(Box::new(PostMessageError::NotOk))
+            Err(SlackError::PostMessageError)
         }
     }
 }
 
 /// Retrieves Slack application token from SSM.
-pub async fn get_slack_token() -> Result<String, Error> {
+pub async fn get_slack_token() -> Result<String> {
     let shared_config = aws_config::load_from_env().await;
     let client = SsmClient::new(&shared_config);
     let token = client
         .get_parameter()
-        .name(env::var("SLACK_TOKEN_PARAMETER")?)
+        .name(env::var("SLACK_TOKEN_PARAMETER").map_err(|_| SlackError::GetSlackTokenError)?)
         .send()
+        .map_err(|_| SlackError::GetSlackTokenError)
         .await?
         .parameter
         .expect("Slack token not found as an SSM parameter.")

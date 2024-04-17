@@ -1,9 +1,9 @@
 use aws_config::SdkConfig;
+use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::Client;
 use maplit::hashmap;
 use model::punch_clock::PunchClock;
 use std::env;
-use aws_sdk_dynamodb::types::AttributeValue;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -15,7 +15,7 @@ pub struct PunchClockRepository {
 impl PunchClockRepository {
     pub fn new(shared_config: &SdkConfig) -> PunchClockRepository {
         PunchClockRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var("PUNCH_CLOCK_TABLE").unwrap(),
         }
     }
@@ -25,16 +25,16 @@ impl PunchClockRepository {
         table_name: String,
     ) -> PunchClockRepository {
         PunchClockRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var(table_name).unwrap(),
         }
     }
 
-    pub async fn get(&self, hero: &String, member: String) -> Result<Option<PunchClock>, Error> {
+    pub async fn get(&self, hero: &str, member: String) -> Result<Option<PunchClock>, Error> {
         let punch_clock = self
             .client
             .get_item()
-            .key("hero", AttributeValue::S(hero.clone()))
+            .key("hero", AttributeValue::S(hero.to_owned()))
             .key("member", AttributeValue::S(member.clone()))
             .table_name(&self.table_name)
             .send()
@@ -61,7 +61,7 @@ impl PunchClockRepository {
             .send()
             .await?
             .items()
-            .into_iter()
+            .iter()
             .map(PunchClock::from_dynamo_item)
             .collect();
 

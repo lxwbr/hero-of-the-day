@@ -41,7 +41,7 @@ impl std::str::FromStr for Operation {
 impl ScheduleRepository {
     pub fn new(shared_config: &SdkConfig) -> ScheduleRepository {
         ScheduleRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var("SCHEDULE_TABLE").unwrap(),
         }
     }
@@ -51,7 +51,7 @@ impl ScheduleRepository {
         table_name: String,
     ) -> ScheduleRepository {
         ScheduleRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var(table_name).unwrap(),
         }
     }
@@ -90,10 +90,10 @@ impl ScheduleRepository {
                 .send()
                 .await?;
 
-
             schedules.extend(
-                request.items()
-                    .into_iter()
+                request
+                    .items()
+                    .iter()
                     .map(Schedule::from_dynamo_item)
                     .collect::<Vec<Schedule>>(),
             );
@@ -113,7 +113,7 @@ impl ScheduleRepository {
     pub async fn update_assignees(
         &self,
         operation: &Operation,
-        hero: &String,
+        hero: &str,
         shift_start_time: i64,
         assignees: Vec<String>,
     ) -> Result<Option<Schedule>, Error> {
@@ -126,7 +126,7 @@ impl ScheduleRepository {
             .client
             .update_item()
             .table_name(&self.table_name)
-            .key("hero", AttributeValue::S(hero.clone()))
+            .key("hero", AttributeValue::S(hero.to_owned()))
             .key(
                 "shift_start_time",
                 AttributeValue::N(shift_start_time.to_string()),
@@ -147,7 +147,7 @@ impl ScheduleRepository {
             self.client
                 .delete_item()
                 .table_name(&self.table_name)
-                .key("hero", AttributeValue::S(hero.clone()))
+                .key("hero", AttributeValue::S(hero.to_owned()))
                 .key(
                     "shift_start_time",
                     AttributeValue::N(shift_start_time.to_string()),
@@ -258,7 +258,7 @@ impl ScheduleRepository {
             .await?;
         let heroes: Vec<Schedule> = response
             .items()
-            .into_iter()
+            .iter()
             .map(Schedule::from_dynamo_item)
             .collect();
         Ok(heroes)

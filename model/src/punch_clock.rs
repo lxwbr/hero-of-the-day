@@ -1,9 +1,9 @@
 use crate::schedule::Schedule;
 use crate::time::days_diff;
+use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
-use aws_sdk_dynamodb::types::AttributeValue;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PunchClock {
@@ -62,7 +62,7 @@ pub fn recalculate_punch_time(hero: String, schedules: Vec<Schedule>) -> Vec<Pun
                         Some(punched) => {
                             let old = punched.clone();
                             let punch_card = PunchClock {
-                                days: days + old.days.clone(),
+                                days: days + old.days,
                                 last_punch: previous.shift_start_time,
                                 ..old
                             };

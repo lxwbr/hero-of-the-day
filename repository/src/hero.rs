@@ -21,14 +21,14 @@ pub enum UpdateOperation {
 impl HeroRepository {
     pub fn new(shared_config: &SdkConfig) -> HeroRepository {
         HeroRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var("HERO_TABLE").unwrap(),
         }
     }
 
     pub fn new_with_table_name(shared_config: &SdkConfig, table_name: String) -> HeroRepository {
         HeroRepository {
-            client: Client::new(&shared_config),
+            client: Client::new(shared_config),
             table_name: env::var(table_name).unwrap(),
         }
     }
@@ -54,7 +54,7 @@ impl HeroRepository {
             .await?;
         let heroes: Vec<Hero> = response
             .items()
-            .into_iter()
+            .iter()
             .map(Hero::from_dynamo_item)
             .collect();
         Ok(heroes)

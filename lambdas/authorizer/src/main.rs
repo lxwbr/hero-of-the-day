@@ -47,7 +47,7 @@ async fn main() -> Result<(), Error> {
 
             let method_arn = &event.payload.method_arn.expect("missing method_arn");
 
-            let token_data = dangerous_insecure_decode::<Claims>(&id_token)?;
+            let token_data = dangerous_insecure_decode::<Claims>(id_token)?;
 
             tracing::info!("Logging in with iss: {:?}", token_data.claims.iss);
 
@@ -67,19 +67,20 @@ async fn main() -> Result<(), Error> {
                             .to_owned()
                             .expect("token claims should have the preferred_username field"),
                     )
-                        .await?;
+                    .await?;
 
                     let policy = check_user(
                         hero_repository_ref,
                         method_arn.to_owned(),
                         Info {
                             sub: token.claims.sub,
-                            email: token.claims.preferred_username.expect(
-                                "token claims should have the preferred_username field",
-                            ),
+                            email: token
+                                .claims
+                                .preferred_username
+                                .expect("token claims should have the preferred_username field"),
                         },
                     )
-                        .await;
+                    .await;
                     tracing::info!("Policy: {:?}", policy);
                     policy
                 }
@@ -107,7 +108,7 @@ async fn check_user(
     info: Info,
 ) -> Result<ApiGatewayCustomAuthorizerResponse, Error> {
     let sub = info.sub;
-    let parts: Vec<&str> = method_arn.split("/").collect();
+    let parts: Vec<&str> = method_arn.split('/').collect();
     let http_verb = parts[2];
     let resource = parts[3];
     let sub_resource = parts[4];
