@@ -1,3 +1,4 @@
+use aws_sdk_ssm::operation::get_parameter::GetParameterOutput;
 use aws_sdk_ssm::Client as SsmClient;
 use futures::prelude::*;
 use model::schedule::Schedule;
@@ -20,8 +21,8 @@ pub enum SlackError {
     CreateUserGroupError,
     #[error("Could not post message.")]
     PostMessageError,
-    #[error("Could not get Slack token.")]
-    GetSlackTokenError,
+    #[error("Could not get Slack token: {0}")]
+    GetSlackTokenError(&'static str),
     #[error("Reqwest error: {0}")]
     ReqwestError(#[from] reqwest::Error),
 }
@@ -32,15 +33,15 @@ pub struct Client {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Usergroup {
+pub struct UserGroup {
     pub id: String,
     pub handle: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct UsergroupsListResponse {
+struct UserGroupsListResponse {
     ok: bool,
-    usergroups: Vec<Usergroup>,
+    usergroups: Vec<UserGroup>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -73,16 +74,13 @@ impl Client {
     }
 
     /// Lists all Slack groups in order to have an id to handle relation.
-    pub async fn usergroups_list(&self) -> Result<Vec<Usergroup>> {
-        let result: UsergroupsListResponse = self
+    pub async fn usergroups_list(&self) -> Result<Vec<UserGroup>> {
+        let result: UserGroupsListResponse = self
             .client
-            .get(
-                format!(
-                    "https://slack.com/api/usergroups.list?token={}&pretty=1",
-                    self.token
-                )
-                .as_str(),
-            )
+            .get(format!(
+                "https://slack.com/api/usergroups.list?token={}&pretty=1",
+                self.token
+            ))
             .send()
             .await?
             .json()
@@ -98,13 +96,10 @@ impl Client {
     pub async fn lookup_by_email(&self, email: String) -> Result<User> {
         let result: UsersLookupByEmailResponse = self
             .client
-            .get(
-                format!(
-                    "https://slack.com/api/users.lookupByEmail?token={}&pretty=1&email={}",
-                    self.token, email
-                )
-                .as_str(),
-            )
+            .get(format!(
+                "https://slack.com/api/users.lookupByEmail?token={}&pretty=1&email={}",
+                self.token, email
+            ))
             .send()
             .map_err(|_| SlackError::UsersLookupByEmailError(email.clone()))
             .await?
@@ -130,7 +125,7 @@ impl Client {
         );
         println!("url: {}", url);
         let result: UsergroupsUsersUpdateResponse =
-            self.client.post(url.as_str()).send().await?.json().await?;
+            self.client.post(url).send().await?.json().await?;
         if result.ok {
             Ok(())
         } else {
@@ -145,7 +140,7 @@ impl Client {
         );
         println!("url: {}", url);
         let result: UsergroupsUsersUpdateResponse =
-            self.client.post(url.as_str()).send().await?.json().await?;
+            self.client.post(url).send().await?.json().await?;
         if result.ok {
             Ok(())
         } else {
@@ -218,8 +213,7 @@ impl Client {
             hero,
             assignees.join(",%20")
         );
-        let result: PostMessageResponse =
-            self.client.post(url.as_str()).send().await?.json().await?;
+        let result: PostMessageResponse = self.client.post(url).send().await?.json().await?;
         if result.ok {
             Ok(())
         } else {
@@ -232,16 +226,24 @@ impl Client {
 pub async fn get_slack_token() -> Result<String> {
     let shared_config = aws_config::load_from_env().await;
     let client = SsmClient::new(&shared_config);
-    let token = client
+    let response: GetParameterOutput = client
         .get_parameter()
-        .name(env::var("SLACK_TOKEN_PARAMETER").map_err(|_| SlackError::GetSlackTokenError)?)
+        .name(
+            env::var("SLACK_TOKEN_PARAMETER")
+                .map_err(|_| SlackError::GetSlackTokenError("SLACK_TOKEN_PARAMETER not set"))?,
+        )
         .send()
-        .map_err(|_| SlackError::GetSlackTokenError)
-        .await?
+        .map_err(|_| SlackError::GetSlackTokenError("Could not get Slack token from SSM."))
+        .await?;
+    let token = response
         .parameter
-        .expect("Slack token not found as an SSM parameter.")
+        .ok_or(SlackError::GetSlackTokenError(
+            "Slack token not found as an SSM parameter.",
+        ))?
         .value
-        .expect("Slack token needs to non-empty.");
+        .ok_or(SlackError::GetSlackTokenError(
+            "Slack token parameter value is empty.",
+        ))?;
 
     Ok(token)
 }
