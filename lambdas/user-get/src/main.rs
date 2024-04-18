@@ -1,5 +1,4 @@
 use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use model::user::User;
 use repository::user::UserRepository;
 use response::{bad_request, ok};
 
@@ -17,14 +16,7 @@ async fn main() -> Result<(), Error> {
 
     run(service_fn(move |event: Request| async move {
         match event.path_parameters().first("email") {
-            Some(email) => {
-                let user = User {
-                    email: email.into(),
-                    last_login: None,
-                    last_seen_release_notes: None,
-                };
-                ok(repository_ref.put(&user).await?)
-            }
+            Some(email) => ok(repository_ref.get(email.to_string()).await?),
             _ => bad_request("Expected email".into()),
         }
     }))

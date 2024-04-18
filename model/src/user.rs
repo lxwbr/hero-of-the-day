@@ -8,10 +8,11 @@ use std::str::FromStr;
 pub struct User {
     pub email: String,
     pub last_login: Option<u64>,
+    pub last_seen_release_notes: Option<String>,
 }
 
-impl User {
-    pub fn from_dynamo_item(item: &HashMap<String, AttributeValue>) -> User {
+impl From<&HashMap<String, AttributeValue>> for User {
+    fn from(item: &HashMap<String, AttributeValue>) -> Self {
         User {
             email: item["email"]
                 .as_s()
@@ -26,6 +27,12 @@ impl User {
                 })
                 .ok()
                 .to_owned(),
+            last_seen_release_notes: item.get("last_seen_release_notes").map(|value| {
+                value
+                    .as_s()
+                    .expect("last_seen_release_notes should be a string")
+                    .to_owned()
+            }),
         }
     }
 }

@@ -1,7 +1,7 @@
-use lambda_http::{run, service_fn, Error, Request, RequestExt};
-use model::user::User;
+use lambda_http::{run, service_fn, Error, Request, RequestExt, RequestPayloadExt};
 use repository::user::UserRepository;
 use response::{bad_request, ok};
+use serde::Deserialize;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -17,17 +17,20 @@ async fn main() -> Result<(), Error> {
 
     run(service_fn(move |event: Request| async move {
         match event.path_parameters().first("email") {
-            Some(email) => {
-                let user = User {
-                    email: email.into(),
-                    last_login: None,
-                    last_seen_release_notes: None,
-                };
-                ok(repository_ref.put(&user).await?)
-            }
+            Some(email) => match event.payload::<Payload>()? {
+                Some(Payload { release_notes }) => ok(repository_ref
+                    .update_last_seen_release_notes(email.to_string(), release_notes)
+                    .await?),
+                None => bad_request("Could not parse JSON payload for schedule update".into()),
+            },
             _ => bad_request("Expected email".into()),
         }
     }))
     .await?;
     Ok(())
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct Payload {
+    release_notes: String,
 }

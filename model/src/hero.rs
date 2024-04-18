@@ -1,7 +1,6 @@
 use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Hero {

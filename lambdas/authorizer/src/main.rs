@@ -5,12 +5,11 @@ use aws_lambda_events::apigw::{
 use azure_jwt::*;
 use jsonwebtoken::dangerous_insecure_decode;
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
-use model::user::User;
+use model::time::secs_now;
 use repository::{hero::HeroRepository, user::UserRepository};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -150,13 +149,7 @@ enum Effect {
 }
 
 async fn logged_in(repository: &UserRepository, email: String) -> Result<(), Error> {
-    let user = User {
-        email,
-        last_login: Some(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()),
-    };
-
-    repository.put(&user).await?;
-
+    repository.update_last_login(email, secs_now()).await?;
     Ok(())
 }
 

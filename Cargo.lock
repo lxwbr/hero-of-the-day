@@ -2811,6 +2811,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "user-get"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "user-update-seen-releasenote"
+version = "0.1.0"
+dependencies = [
+ "aws-config",
+ "lambda_http",
+ "model",
+ "repository",
+ "response",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "uuid"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

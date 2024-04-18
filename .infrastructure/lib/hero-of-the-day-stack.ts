@@ -46,10 +46,12 @@ export class HeroOfTheDayStack extends Stack {
     let punchClockRecalculateFn: IFunction = this.punchClockRecalculate(scheduleTable, punchClockTable, slackParameter);
     let punchClockStatsFn: IFunction = this.punchClockStats(punchClockTable, scheduleTable, slackParameter);
     let recalculatePunchClockFn: IFunction = this.recalculatePunchClock(heroTable, scheduleTable, punchClockTable);
+    let userUpdateSeenReleaseNotesFn: IFunction = this.userUpdateSeenReleaseNotes(userTable);
+    let userGetFn: IFunction = this.userGet(userTable);
 
     this.slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn);
 
-    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn, punchClockRecalculateFn, punchClockStatsFn, recalculatePunchClockFn);
+    this.apiGateway(authorizer, heroListFn, heroGetFn, userCreateFn, scheduleGetFn, scheduleUpdateFn, heroPutFn, heroMemberDeleteFn, heroDeleteFn, punchClockRecalculateFn, punchClockStatsFn, recalculatePunchClockFn, userUpdateSeenReleaseNotesFn, userGetFn);
   }
 
   slackUsergroupUsersUpdateScheduleRule(slackUsergroupUsersUpdateFn: IFunction): IRule {
@@ -221,6 +223,18 @@ export class HeroOfTheDayStack extends Stack {
     return fn;
   }
 
+  userUpdateSeenReleaseNotes(userTable: ITable): IFunction {
+    let fn = this.createFn('UserUpdateSeenReleaseNotesFunction', 'user-update-seen-releasenotes');
+    userTable.grantReadWriteData(fn);
+    return fn;
+  }
+
+  userGet(userTable: ITable): IFunction {
+    let fn = this.createFn('UserGetFunction', 'user-get');
+    userTable.grantReadData(fn);
+    return fn;
+  }
+
   apiGateway(
     authorizerFn: IFunction,
     heroListFn: IFunction,
@@ -233,7 +247,9 @@ export class HeroOfTheDayStack extends Stack {
     heroDeleteFn: IFunction,
     punchClockRecalculateFn: IFunction,
     punchClockStatsFn: IFunction,
-    recalculatePunchClockFn: IFunction
+    recalculatePunchClockFn: IFunction,
+    userUpdateSeenReleaseNotesFn: IFunction,
+    userGetFn: IFunction
   ) {
     const api = new apigw.RestApi(this, `${this.env.APP_NAME}-api`, {
       description: this.env.APP_NAME,
@@ -319,8 +335,23 @@ export class HeroOfTheDayStack extends Stack {
       }
     )
 
-    userPath.addResource('{user}').addMethod('PUT',
+    const userSubPath = userPath.addResource('{user}');
+    userSubPath.addMethod('PUT',
       new apigw.LambdaIntegration(userCreateFn, { proxy: true }), 
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+    userSubPath.addMethod('GET',
+      new apigw.LambdaIntegration(userGetFn, { proxy: true }),
+      {
+        authorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM
+      }
+    )
+    userSubPath.addResource('seen-release-notes').addMethod('PUT',
+      new apigw.LambdaIntegration(userUpdateSeenReleaseNotesFn, { proxy: true }),
       {
         authorizer,
         authorizationType: apigw.AuthorizationType.CUSTOM
