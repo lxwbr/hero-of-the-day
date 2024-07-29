@@ -41,7 +41,7 @@ impl HeroRepository {
             .table_name(&self.table_name)
             .send()
             .await?;
-        let hero: Hero = Hero::from_dynamo_item(response.item().expect("hero not found"));
+        let hero: Hero = Hero::try_from(response.item().expect("hero not found"))?;
         Ok(hero)
     }
 
@@ -55,7 +55,13 @@ impl HeroRepository {
         let heroes: Vec<Hero> = response
             .items()
             .iter()
-            .map(Hero::from_dynamo_item)
+            .filter_map(|item| match Hero::try_from(item) {
+                Ok(item) => Some(item),
+                Err(_) => {
+                    eprintln!("Failed to parse item: {:?}", item);
+                    None
+                }
+            })
             .collect();
         Ok(heroes)
     }
