@@ -57,8 +57,8 @@ impl HeroRepository {
             .iter()
             .filter_map(|item| match Hero::try_from(item) {
                 Ok(item) => Some(item),
-                Err(_) => {
-                    eprintln!("Failed to parse item: {:?}", item);
+                Err(err) => {
+                    eprintln!("Failed to parse item: {}", err.to_string());
                     None
                 }
             })
