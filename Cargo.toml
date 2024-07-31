@@ -17,6 +17,7 @@ anyhow = "1.0.82"
 thiserror = "1.0.58"
 chrono = "0.4.31"
 chrono-tz = "0.9.0"
+email_address = "0.2.7"
 futures = "0.3.4"
 lambda_runtime = "0.11.1"
 lambda_http = { version = "0.11.1", default-features = false, features = ["apigw_rest"] }
