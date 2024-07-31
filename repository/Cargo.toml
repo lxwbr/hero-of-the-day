@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 aws-sdk-dynamodb = { workspace = true }
 aws-config = { workspace = true }
+email_address = { workspace = true }
 model = { path = "../model" }
 maplit = "1.0.2"
 futures = { workspace = true }

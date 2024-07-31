@@ -3,6 +3,7 @@ use aws_sdk_dynamodb::{
     types::{AttributeValue, ReturnValue},
     Client,
 };
+use email_address::EmailAddress;
 use model::hero::Hero;
 use std::env;
 
@@ -58,7 +59,7 @@ impl HeroRepository {
             .filter_map(|item| match Hero::try_from(item) {
                 Ok(item) => Some(item),
                 Err(err) => {
-                    eprintln!("Failed to parse item: {}", err.to_string());
+                    eprintln!("Failed to parse item: {}", err);
                     None
                 }
             })
@@ -80,7 +81,7 @@ impl HeroRepository {
     pub async fn update_members(
         &self,
         hero: String,
-        members: Vec<String>,
+        members: Vec<EmailAddress>,
         operation: UpdateOperation,
     ) -> Result<Vec<String>, Error> {
         let update_expression = match operation {
@@ -93,7 +94,10 @@ impl HeroRepository {
             .update_item()
             .table_name(&self.table_name)
             .key("name", AttributeValue::S(hero.clone()))
-            .expression_attribute_values(":m", AttributeValue::Ss(members))
+            .expression_attribute_values(
+                ":m",
+                AttributeValue::Ss(members.iter().map(|m| m.to_string()).collect()),
+            )
             .update_expression(update_expression)
             .return_values(ReturnValue::UpdatedNew)
             .send()

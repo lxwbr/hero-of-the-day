@@ -3,6 +3,7 @@ use aws_sdk_dynamodb::{
     types::{AttributeValue, ReturnValue},
     Client,
 };
+use email_address::EmailAddress;
 use futures::future;
 use maplit::hashmap;
 use model::schedule::Schedule;
@@ -115,7 +116,7 @@ impl ScheduleRepository {
         operation: &Operation,
         hero: &str,
         shift_start_time: i64,
-        assignees: Vec<String>,
+        assignees: Vec<EmailAddress>,
     ) -> Result<Option<Schedule>, Error> {
         let update_expression = match operation {
             Operation::Add => "ADD assignees :a".to_string(),
@@ -132,7 +133,10 @@ impl ScheduleRepository {
                 AttributeValue::N(shift_start_time.to_string()),
             )
             .update_expression(update_expression)
-            .expression_attribute_values(":a", AttributeValue::Ss(assignees))
+            .expression_attribute_values(
+                ":a",
+                AttributeValue::Ss(assignees.iter().map(|m| m.to_string()).collect()),
+            )
             .return_values(ReturnValue::AllNew)
             .send()
             .await?;

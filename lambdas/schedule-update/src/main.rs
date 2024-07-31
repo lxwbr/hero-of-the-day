@@ -1,12 +1,15 @@
+use std::fmt;
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
+use email_address::EmailAddress;
 use lambda_http::{run, service_fn, Error, Request, RequestExt, RequestPayloadExt};
 use repository::hero::HeroRepository;
 use repository::schedule::{Operation, ScheduleRepository};
 use response::{bad_request, ok};
-use serde::Deserialize;
+use serde::de::{SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 use serde_json::json;
 
 #[tokio::main]
@@ -102,7 +105,45 @@ fn midnight(timezone: &str) -> DateTime<Tz> {
 struct Payload {
     timezone: String,
     shift_start_time: String,
-    assignees: Vec<String>,
+    #[serde(deserialize_with = "deserialize_emails")]
+    assignees: Vec<EmailAddress>,
     repeat_every_n_days: Option<i64>,
     operation: String,
+}
+
+fn deserialize_emails<'de, D>(deserializer: D) -> Result<Vec<EmailAddress>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct EmailAddressesVisitor;
+
+    impl<'de> Visitor<'de> for EmailAddressesVisitor {
+        type Value = Vec<EmailAddress>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an email addresses map")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut result = vec![];
+
+            while let Some(element) = seq.next_element::<String>()? {
+                match EmailAddress::from_str(&element) {
+                    Ok(email) => {
+                        result.push(email);
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to parse email: {}", err);
+                    }
+                }
+            }
+
+            Ok(result)
+        }
+    }
+
+    deserializer.deserialize_seq(EmailAddressesVisitor)
 }
