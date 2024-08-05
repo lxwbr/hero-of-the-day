@@ -78,11 +78,20 @@ async fn main() -> Result<(), Error> {
             .collect();
 
         for (hero, schedule) in heroes.into_iter() {
-            if let Some(channel) = hero.channel {
+            if let Some(ref channel) = hero.channel {
                 if days_diff(secs_now() as i64, schedule.shift_start_time) == 0 {
-                    client
+                    match client
                         .post_message(&channel, &hero.name, schedule.assignees.clone())
-                        .await?;
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprintln!(
+                                "Error posting slack message for hero {:?} in channel {}: {:?}",
+                                hero, channel, err
+                            );
+                        }
+                    }
                 }
             }
         }
