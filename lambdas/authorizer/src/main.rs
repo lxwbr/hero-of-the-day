@@ -44,6 +44,8 @@ async fn main() -> Result<(), Error> {
                 .authorization_token
                 .expect("missing authorization_token")[7..];
 
+            tracing::info!("{id_token}");
+
             let method_arn = &event.payload.method_arn.expect("missing method_arn");
 
             let token_data = dangerous_insecure_decode::<Claims>(id_token)?;
